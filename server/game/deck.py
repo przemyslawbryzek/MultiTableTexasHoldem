@@ -10,3 +10,10 @@ class Deck:
         if not self.cards:
             raise ValueError("No more cards in the deck")
         return self.cards.pop()
+    def deal_cards(self, num: int) -> list[Card]:
+        if len(self.cards) < num:
+            raise ValueError("Not enough cards in the deck")
+        return [self.deal_card() for _ in range(num)]
+    def reset(self):
+        self.__init__()
+        self.shuffle()

@@ -1,8 +1,8 @@
 from enum import Enum
 class GameState(Enum):
-    PRE_FLOP = 1
-    FLOP = 2
-    TURN = 3
-    RIVER = 4
-    SHOWDOWN = 5
-    
+    WAITING = 1
+    PRE_FLOP = 2
+    FLOP = 3
+    TURN = 4
+    RIVER = 5
+    SHOWDOWN = 6
