@@ -164,7 +164,12 @@ class Server:
             self._broadcast_table_state(table_id)
 
         except Exception as e:
-            self._send_error(fileno, str(e))
+            self._send(fileno, {
+                "type": MessageType.CREATE_TABLE_RESPONSE,
+                "success": False,
+                "table_id": None,
+                "error": str(e),
+            })
 
     def _handle_join_table(self, fileno: int, msg: dict):
         try:
@@ -200,7 +205,12 @@ class Server:
             logging.info(f"Player {player_name} joined table {table_id}")
 
         except Exception as e:
-            self._send_error(fileno, str(e))
+            self._send(fileno, {
+                "type": MessageType.JOIN_TABLE_RESPONSE,
+                "success": False,
+                "table_id": None,
+                "error": str(e),
+            })
 
     def _handle_start_table(self, fileno: int, msg: dict):
         try:
@@ -251,7 +261,13 @@ class Server:
                 self._broadcast_table_state(table_id)
 
         except ValueError as e:
-            self._send_error(fileno, str(e))
+            self._send(fileno, {
+                "type": MessageType.ACTION_RESPONSE,
+                "success": False,
+                "action": msg.get("action"),
+                "amount": msg.get("amount", 0),
+                "error": str(e),
+            })
         except Exception as e:
             logging.error(f"Action error: {e}")
             self._send_error(fileno, "Internal server error")
