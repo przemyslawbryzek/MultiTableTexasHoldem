@@ -40,6 +40,10 @@ class ScreenManager:
         surface.blit(temp_surface, (0, 410))
 
     def handle_event(self, event: pygame.event.Event):
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            adjusted_pos = (event.pos[0], event.pos[1] - 410)
+            adjusted_event = pygame.event.Event(event.type, pos=adjusted_pos, button=event.button)
+            return self.bottom.handle_event(adjusted_event)
         return self.bottom.handle_event(event)
     
 if __name__ == "__main__":
@@ -125,7 +129,7 @@ if __name__ == "__main__":
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-            result = bottom_screen.handle_event(event)
+            result = screen_manager.handle_event(event)
             if result:
                 action, amount = result
                 print(f"Kliknięto: {action} {amount}")
