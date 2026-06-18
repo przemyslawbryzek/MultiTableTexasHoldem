@@ -1,6 +1,5 @@
 import json
 import struct
-from shared.enums import MessageType, ActionType
 from typing import TypedDict, Optional
 
 

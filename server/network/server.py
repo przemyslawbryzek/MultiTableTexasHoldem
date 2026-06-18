@@ -5,8 +5,8 @@ import logging
 from dataclasses import dataclass
 from server.utils import db, kdf
 from server.network.table_manager import TableManager
-from shared.protocol import Protocol, MessageType
-from shared.enums import GameState
+from shared.protocol import Protocol
+from shared.enums import GameState, MessageType
 
 BUFFER_SIZE = 4096
 
