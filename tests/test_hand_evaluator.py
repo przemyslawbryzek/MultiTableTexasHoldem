@@ -11,67 +11,89 @@ def c(rank: int, suit: int) -> Card:
 class TestHandEvaluator(unittest.TestCase):
     def test_evaluate_hand_high_card(self):
         self.assertEqual(
-            HandEvaluator.evaluate_hand([c(14, 0), c(9, 1)], [c(2, 2), c(5, 3), c(7, 0), c(11, 2), c(13, 1)]),
+            HandEvaluator.evaluate_hand(
+                [c(14, 0), c(9, 1)], [c(2, 2), c(5, 3), c(7, 0), c(11, 2), c(13, 1)]
+            ),
             -1,
         )
 
     def test_evaluate_hand_one_pair(self):
         self.assertEqual(
-            HandEvaluator.evaluate_hand([c(14, 0), c(14, 1)], [c(2, 2), c(5, 3), c(7, 0), c(11, 2), c(13, 1)]),
+            HandEvaluator.evaluate_hand(
+                [c(14, 0), c(14, 1)], [c(2, 2), c(5, 3), c(7, 0), c(11, 2), c(13, 1)]
+            ),
             0,
         )
 
     def test_evaluate_hand_two_pair(self):
         self.assertEqual(
-            HandEvaluator.evaluate_hand([c(14, 0), c(14, 1)], [c(2, 2), c(2, 3), c(7, 0), c(11, 2), c(13, 1)]),
+            HandEvaluator.evaluate_hand(
+                [c(14, 0), c(14, 1)], [c(2, 2), c(2, 3), c(7, 0), c(11, 2), c(13, 1)]
+            ),
             1,
         )
 
     def test_evaluate_hand_three_of_a_kind(self):
         self.assertEqual(
-            HandEvaluator.evaluate_hand([c(14, 0), c(14, 1)], [c(14, 2), c(2, 3), c(7, 0), c(11, 2), c(13, 1)]),
+            HandEvaluator.evaluate_hand(
+                [c(14, 0), c(14, 1)], [c(14, 2), c(2, 3), c(7, 0), c(11, 2), c(13, 1)]
+            ),
             2,
         )
 
     def test_evaluate_hand_straight(self):
         self.assertEqual(
-            HandEvaluator.evaluate_hand([c(9, 0), c(10, 1)], [c(11, 2), c(12, 3), c(13, 0), c(2, 2), c(7, 1)]),
+            HandEvaluator.evaluate_hand(
+                [c(9, 0), c(10, 1)], [c(11, 2), c(12, 3), c(13, 0), c(2, 2), c(7, 1)]
+            ),
             3,
         )
 
     def test_evaluate_hand_flush(self):
         self.assertEqual(
-            HandEvaluator.evaluate_hand([c(2, 0), c(9, 0)], [c(4, 0), c(7, 0), c(11, 0), c(3, 1), c(13, 2)]),
+            HandEvaluator.evaluate_hand(
+                [c(2, 0), c(9, 0)], [c(4, 0), c(7, 0), c(11, 0), c(3, 1), c(13, 2)]
+            ),
             4,
         )
 
     def test_evaluate_hand_full_house(self):
         self.assertEqual(
-            HandEvaluator.evaluate_hand([c(14, 0), c(14, 1)], [c(14, 2), c(2, 3), c(2, 0), c(11, 2), c(13, 1)]),
+            HandEvaluator.evaluate_hand(
+                [c(14, 0), c(14, 1)], [c(14, 2), c(2, 3), c(2, 0), c(11, 2), c(13, 1)]
+            ),
             5,
         )
 
     def test_evaluate_hand_full_house_three_and_two_pattern(self):
         self.assertEqual(
-            HandEvaluator.evaluate_hand([c(10, 0), c(10, 1)], [c(10, 2), c(4, 3), c(4, 0), c(11, 2), c(13, 1)]),
+            HandEvaluator.evaluate_hand(
+                [c(10, 0), c(10, 1)], [c(10, 2), c(4, 3), c(4, 0), c(11, 2), c(13, 1)]
+            ),
             5,
         )
 
     def test_evaluate_hand_four_of_a_kind(self):
         self.assertEqual(
-            HandEvaluator.evaluate_hand([c(14, 0), c(14, 1)], [c(14, 2), c(14, 3), c(2, 0), c(11, 2), c(13, 1)]),
+            HandEvaluator.evaluate_hand(
+                [c(14, 0), c(14, 1)], [c(14, 2), c(14, 3), c(2, 0), c(11, 2), c(13, 1)]
+            ),
             6,
         )
 
     def test_evaluate_hand_straight_flush(self):
         self.assertEqual(
-            HandEvaluator.evaluate_hand([c(9, 0), c(10, 0)], [c(11, 0), c(12, 0), c(13, 0), c(2, 2), c(7, 1)]),
+            HandEvaluator.evaluate_hand(
+                [c(9, 0), c(10, 0)], [c(11, 0), c(12, 0), c(13, 0), c(2, 2), c(7, 1)]
+            ),
             7,
         )
 
     def test_evaluate_hand_royal_flush(self):
         self.assertEqual(
-            HandEvaluator.evaluate_hand([c(10, 0), c(11, 0)], [c(12, 0), c(13, 0), c(14, 0), c(2, 2), c(7, 1)]),
+            HandEvaluator.evaluate_hand(
+                [c(10, 0), c(11, 0)], [c(12, 0), c(13, 0), c(14, 0), c(2, 2), c(7, 1)]
+            ),
             8,
         )
 
@@ -150,7 +172,9 @@ class TestHandEvaluator(unittest.TestCase):
 
         self.assertEqual(HandEvaluator.hand_comparator(hand1, hand2, public_cards), -1)
 
-    def test_hand_comparator_wheel_straight_flush_should_lose_to_higher_straight_flush(self):
+    def test_hand_comparator_wheel_straight_flush_should_lose_to_higher_straight_flush(
+        self,
+    ):
         public_cards = [c(2, 0), c(3, 0), c(4, 0), c(5, 0), c(9, 2)]
         hand1 = [c(14, 0), c(8, 1)]
         hand2 = [c(6, 0), c(7, 1)]
@@ -182,14 +206,14 @@ class TestHandEvaluator(unittest.TestCase):
         public_cards = [c(14, 0), c(12, 0), c(10, 0), c(5, 0), c(13, 1)]
         hand1 = [c(11, 0), c(9, 0)]
         hand2 = [c(13, 0), c(8, 0)]
-        
+
         self.assertEqual(HandEvaluator.hand_comparator(hand1, hand2, public_cards), -1)
 
     def test_hand_comparator_flush_third_card_breaks_tie(self):
         public_cards = [c(14, 0), c(13, 0), c(9, 0), c(5, 0), c(12, 1)]
         hand1 = [c(12, 0), c(8, 0)]
         hand2 = [c(11, 0), c(10, 0)]
-        
+
         self.assertEqual(HandEvaluator.hand_comparator(hand1, hand2, public_cards), 1)
 
     def test_hand_comparator_flush_identical_ranks_tie(self):
@@ -210,8 +234,9 @@ class TestHandEvaluator(unittest.TestCase):
         public_cards = [c(14, 1), c(13, 1), c(12, 1), c(11, 1), c(10, 0)]
         hand1 = [c(9, 0), c(8, 0)]
         hand2 = [c(9, 1), c(8, 1)]
-        
+
         self.assertEqual(HandEvaluator.hand_comparator(hand1, hand2, public_cards), 0)
+
 
 if __name__ == "__main__":
     unittest.main()

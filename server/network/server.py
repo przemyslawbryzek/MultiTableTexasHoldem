@@ -2,18 +2,24 @@ import socket
 import select
 import sys
 import logging
+from server.utils import db, kdf
 from server.network.table_manager import TableManager
 from shared.protocol import Protocol, MessageType
 
 
 class Server:
-    def __init__(self, host: str = '0.0.0.0', port: int = 7777):
+    def __init__(self, host: str = "0.0.0.0", port: int = 7777):
+        db.init()
         self.host = host
         self.port = port
         self.table_manager = TableManager()
         self.fd_to_socket: dict[int, socket.socket] = {}
         self.fd_to_buffer: dict[int, bytes] = {}
-        logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(levelname)s: %(message)s', stream=sys.stdout)
+        logging.basicConfig(
+            level=logging.INFO,
+            format="[%(asctime)s] %(levelname)s: %(message)s",
+            stream=sys.stdout,
+        )
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.server_socket.setblocking(False)
@@ -107,18 +113,19 @@ class Server:
         except Exception as e:
             logging.error(f"Error reading fd={fileno}: {e}")
             self._disconnect_client(fileno)
+
     def _handle_message(self, fileno: int, msg: dict):
         msg_type = msg.get("type")
         logging.debug(f"fd={fileno} type={msg_type}")
 
         handlers = {
             MessageType.CREATE_ACCOUNT: self._handle_create_account,
-            MessageType.LOGIN:          self._handle_login,
-            MessageType.GET_TABLES:     self._handle_get_tables,
-            MessageType.CREATE_TABLE:   self._handle_create_table,
-            MessageType.JOIN_TABLE:     self._handle_join_table,
-            MessageType.START_TABLE:    self._handle_start_table,
-            MessageType.ACTION:         self._handle_action,
+            MessageType.LOGIN: self._handle_login,
+            MessageType.GET_TABLES: self._handle_get_tables,
+            MessageType.CREATE_TABLE: self._handle_create_table,
+            MessageType.JOIN_TABLE: self._handle_join_table,
+            MessageType.START_TABLE: self._handle_start_table,
+            MessageType.ACTION: self._handle_action,
         }
 
         handler = handlers.get(msg_type)
@@ -127,19 +134,34 @@ class Server:
         else:
             self._send_error(fileno, f"Unknown message type: {msg_type}")
 
-
     def _handle_create_account(self, fileno: int, msg: dict):
-        # TODO: implement with SQLite
-        # For now: acknowledge
-        self._send(fileno, {"type": MessageType.CREATE_ACCOUNT_RESPONSE, "message": "Account created"})
+        password = kdf.hash(msg["password"])
+        user = db.create_user(msg["username"], password)
+        if user is None:
+            # TODO: error handling
+            return
+        self._send(
+            fileno,
+            {
+                "type": MessageType.CREATE_ACCOUNT_RESPONSE,
+                "message": "Account created",
+            },
+        )
 
     def _handle_get_tables(self, fileno: int, msg: dict):
         tables = self.table_manager.get_tables()
         self._send(fileno, {"type": MessageType.GET_TABLES_RESPONSE, "tables": tables})
 
     def _handle_login(self, fileno: int, msg: dict):
-        # TODO: implement with SQLite
-        # For now: acknowledge
+        user = db.get_user(msg["username"])
+        if user is None:
+            kdf.verify("mock", user.password)
+            # TODO: error handling
+            return
+        ok = kdf.verify(msg["password"], user.password)
+        if not ok:
+            # TODO: error handling
+            return
         self._send(fileno, {"type": MessageType.LOGIN_RESPONSE, "message": "Logged in"})
 
     def _handle_create_table(self, fileno: int, msg: dict):
@@ -155,21 +177,27 @@ class Server:
                 big_blind=big_blind,
             )
             logging.info(f"Table {table_id} created by fd={fileno}")
-            self._send(fileno, {
-                "type": MessageType.CREATE_TABLE_RESPONSE,
-                "success": True,
-                "table_id": table_id,
-                "error": None,
-            })
+            self._send(
+                fileno,
+                {
+                    "type": MessageType.CREATE_TABLE_RESPONSE,
+                    "success": True,
+                    "table_id": table_id,
+                    "error": None,
+                },
+            )
             self._broadcast_table_state(table_id)
 
         except Exception as e:
-            self._send(fileno, {
-                "type": MessageType.CREATE_TABLE_RESPONSE,
-                "success": False,
-                "table_id": None,
-                "error": str(e),
-            })
+            self._send(
+                fileno,
+                {
+                    "type": MessageType.CREATE_TABLE_RESPONSE,
+                    "success": False,
+                    "table_id": None,
+                    "error": str(e),
+                },
+            )
 
     def _handle_join_table(self, fileno: int, msg: dict):
         try:
@@ -184,12 +212,15 @@ class Server:
                 client_fd=fileno,
             )
 
-            self._send(fileno, {
-                "type": MessageType.JOIN_TABLE_RESPONSE,
-                "success": True,
-                "table_id": table_id,
-                "error": None,
-            })
+            self._send(
+                fileno,
+                {
+                    "type": MessageType.JOIN_TABLE_RESPONSE,
+                    "success": True,
+                    "table_id": table_id,
+                    "error": None,
+                },
+            )
 
             table = self.table_manager.get_table(table_id)
             joined_msg = {
@@ -198,19 +229,22 @@ class Server:
                     "id": player_id,
                     "name": player_name,
                     "chips": table.players[-1].chips.total_value(),
-                }
+                },
             }
             self._broadcast(table_id, joined_msg, exclude_fd=fileno)
             self._broadcast_table_state(table_id)
             logging.info(f"Player {player_name} joined table {table_id}")
 
         except Exception as e:
-            self._send(fileno, {
-                "type": MessageType.JOIN_TABLE_RESPONSE,
-                "success": False,
-                "table_id": None,
-                "error": str(e),
-            })
+            self._send(
+                fileno,
+                {
+                    "type": MessageType.JOIN_TABLE_RESPONSE,
+                    "success": False,
+                    "table_id": None,
+                    "error": str(e),
+                },
+            )
 
     def _handle_start_table(self, fileno: int, msg: dict):
         try:
@@ -243,31 +277,39 @@ class Server:
             table = self.table_manager.get_table(table_id)
             table.process_player_action(player_id, action, amount)
 
-            self._send(fileno, {
-                "type": MessageType.ACTION_RESPONSE,
-                "success": True,
-                "action": action,
-                "amount": amount,
-                "error": None,
-            })
+            self._send(
+                fileno,
+                {
+                    "type": MessageType.ACTION_RESPONSE,
+                    "success": True,
+                    "action": action,
+                    "amount": amount,
+                    "error": None,
+                },
+            )
 
-            logging.info(f"Player {player_id} action={action} amount={amount} table={table_id}")
-
+            logging.info(
+                f"Player {player_id} action={action} amount={amount} table={table_id}"
+            )
 
             from shared.enums import GameState
+
             if table.game_state == GameState.WAITING:
                 self._broadcast_hand_end(table_id)
             else:
                 self._broadcast_table_state(table_id)
 
         except ValueError as e:
-            self._send(fileno, {
-                "type": MessageType.ACTION_RESPONSE,
-                "success": False,
-                "action": msg.get("action"),
-                "amount": msg.get("amount", 0),
-                "error": str(e),
-            })
+            self._send(
+                fileno,
+                {
+                    "type": MessageType.ACTION_RESPONSE,
+                    "success": False,
+                    "action": msg.get("action"),
+                    "amount": msg.get("amount", 0),
+                    "error": str(e),
+                },
+            )
         except Exception as e:
             logging.error(f"Action error: {e}")
             self._send_error(fileno, "Internal server error")
@@ -328,25 +370,30 @@ class Server:
 
     def _send_error(self, fileno: int, message: str):
         logging.warning(f"Error to fd={fileno}: {message}")
-        self._send(fileno, {
-            "type": MessageType.ERROR,
-            "message": message,
-        })
+        self._send(
+            fileno,
+            {
+                "type": MessageType.ERROR,
+                "message": message,
+            },
+        )
 
     def _build_state_message(self, table, viewer_id: int) -> dict:
         players_info = []
         for p in table.players:
-            players_info.append({
-                "id": p.id,
-                "name": p.name,
-                "chips": p.chips.total_value(),
-                "bet": p.bet_this_round,
-                "is_folded": p.is_folded,
-                "is_all_in": p.is_all_in,
-                "is_active": p.is_active,
-                "hand": [str(c) for c in p.hand] if p.id == viewer_id else [],
-                "hand_size": len(p.hand),
-            })
+            players_info.append(
+                {
+                    "id": p.id,
+                    "name": p.name,
+                    "chips": p.chips.total_value(),
+                    "bet": p.bet_this_round,
+                    "is_folded": p.is_folded,
+                    "is_all_in": p.is_all_in,
+                    "is_active": p.is_active,
+                    "hand": [str(c) for c in p.hand] if p.id == viewer_id else [],
+                    "hand_size": len(p.hand),
+                }
+            )
 
         return {
             "type": MessageType.STATE,

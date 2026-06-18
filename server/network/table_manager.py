@@ -3,7 +3,10 @@ import logging
 from server.game.table import Table
 from shared.datatypes import Player
 from shared.enums import GameState
+
 STARTING_CHIPS = {1000: 0, 500: 0, 100: 5, 50: 10, 25: 0, 10: 50, 5: 0, 1: 0}
+
+
 class TableManager:
 
     def __init__(self):
@@ -11,7 +14,6 @@ class TableManager:
         self.fd_to_player: dict[int, tuple[int, int]] = {}
         self.table_to_fds: dict[int, list[int]] = {}
         self._next_table_id = 1
-
 
     def create_table(
         self,
@@ -73,6 +75,7 @@ class TableManager:
 
         if table:
             from shared.enums import GameState
+
             if table.game_state != GameState.WAITING:
                 current = table.players[table.current_player_idx]
                 if current.id == player_id:
@@ -105,6 +108,7 @@ class TableManager:
 
     def get_all_tables(self) -> dict[int, Table]:
         return self.tables.copy()
+
     def get_tables(self) -> list[dict]:
         return [
             {
@@ -114,5 +118,6 @@ class TableManager:
                 "big_blind": table.big_blind,
                 "game_state": table.game_state.name,
             }
-            for table_id, table in self.tables.items() if table.game_state == GameState.WAITING
+            for table_id, table in self.tables.items()
+            if table.game_state == GameState.WAITING
         ]

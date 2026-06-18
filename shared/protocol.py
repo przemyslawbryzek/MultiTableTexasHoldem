@@ -3,6 +3,7 @@ import struct
 from shared.enums import MessageType, ActionType
 from typing import TypedDict, Optional
 
+
 class Protocol:
     HEADER_SIZE = 4
 
@@ -17,13 +18,13 @@ class Protocol:
         if len(buffer) < Protocol.HEADER_SIZE:
             return None, buffer
 
-        length = struct.unpack(">I", buffer[:Protocol.HEADER_SIZE])[0]
+        length = struct.unpack(">I", buffer[: Protocol.HEADER_SIZE])[0]
 
         if len(buffer) < Protocol.HEADER_SIZE + length:
             return None, buffer
 
-        payload = buffer[Protocol.HEADER_SIZE:Protocol.HEADER_SIZE + length]
-        remaining = buffer[Protocol.HEADER_SIZE + length:]
+        payload = buffer[Protocol.HEADER_SIZE : Protocol.HEADER_SIZE + length]
+        remaining = buffer[Protocol.HEADER_SIZE + length :]
 
         try:
             msg = json.loads(payload.decode("utf-8"))
@@ -31,9 +32,11 @@ class Protocol:
             return None, remaining
 
         return msg, remaining
-    
+
+
 class GetTablesMessage(TypedDict):
     type: str
+
 
 class JoinTableMessage(TypedDict):
     type: str
@@ -69,6 +72,7 @@ class LoginMessage(TypedDict):
     type: str
     username: str
     password: str
+
 
 class PlayerInfo(TypedDict):
     id: int
