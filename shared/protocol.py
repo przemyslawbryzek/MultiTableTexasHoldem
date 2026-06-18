@@ -40,6 +40,7 @@ class JoinTableMessage(TypedDict):
     table_id: int
     player_name: str
     player_id: int
+    player_avatar: int
 
 
 class CreateTableMessage(TypedDict):
@@ -47,6 +48,7 @@ class CreateTableMessage(TypedDict):
     player_name: str
     player_id: int
     big_blind: int
+    player_avatar: int
 
 
 class StartTableMessage(TypedDict):
@@ -79,6 +81,7 @@ class PlayerInfo(TypedDict):
     is_all_in: bool
     is_active: bool
     hand: list[str]
+    player_avatar: int
 
 
 class GameStateMessage(TypedDict):

@@ -22,8 +22,8 @@ class ScreenManager:
             except Exception:
                 self.separator_texture = None
 
-    def update(self, state, player_id: int):
-        self.top.update(state)
+    def update(self, state, player_id: int, dt_ms: float = 16.0):
+        self.top.update(state, player_id, dt_ms)
         self.bottom.update(state, player_id)
 
     def draw(self, surface: pygame.Surface):
@@ -59,9 +59,10 @@ if __name__ == "__main__":
         PlayerState(
             id=1,
             name="x",
+            avatar=1,
             chips={100: 5,25:6, 10: 10, 5: 50},
-            bet_this_round=0,
-            total_bet_this_hand=0,
+            bet_this_round=200,
+            total_bet_this_hand=500,
             is_active=True,
             is_folded=False,
             is_all_in=False,
@@ -72,6 +73,7 @@ if __name__ == "__main__":
         PlayerState(
             id=2,
             name="y",
+            avatar=2,
             chips={100: 10},
             bet_this_round=40,
             total_bet_this_hand=40,
@@ -85,16 +87,101 @@ if __name__ == "__main__":
         PlayerState(
             id=3,
             name="z",
+            avatar=1,
             chips={100: 8},
             bet_this_round=40,
             total_bet_this_hand=40,
             is_active=True,
-            is_folded=False,
+            is_folded=True,
             is_all_in=False,
             position=2,
             hand=[],
             hand_size=2,
         ),
+            PlayerState(
+                id=4,
+                name="w",
+                avatar=2,
+                chips={100: 2},
+                bet_this_round=40,
+                total_bet_this_hand=40,
+                is_active=True,
+                is_folded=False,
+                is_all_in=True,
+                position=3,
+                hand=[],
+                hand_size=2,
+            ),
+            PlayerState(
+                id=5,
+                name="v",
+                avatar=1,
+                chips={100: 20},
+                bet_this_round=40,
+                total_bet_this_hand=40,
+                is_active=False,
+                is_folded=False,
+                is_all_in=False,
+                position=4,
+                hand=[],
+                hand_size=2,
+            ),
+            PlayerState(
+                id=6,
+                name="u",
+                avatar=2,
+                chips={100: 20},
+                bet_this_round=40,
+                total_bet_this_hand=40,
+                is_active=True,
+                is_folded=False,
+                is_all_in=False,
+                position=5,
+                hand=[],
+                hand_size=2,
+            ),
+            PlayerState(
+                id=7,
+                name="t",
+                avatar=1,
+                chips={100: 20},
+                bet_this_round=40,
+                total_bet_this_hand=40,
+                is_active=True,
+                is_folded=False,
+                is_all_in=False,
+                position=6,
+                hand=[],
+                hand_size=2,
+            ),
+            PlayerState(
+                id=8,
+                name="s",
+                avatar=2,
+                chips={100: 20},
+                bet_this_round=40,
+                total_bet_this_hand=40,
+                is_active=True,
+                is_folded=False,
+                is_all_in=False,
+                position=7,
+                hand=[],
+                hand_size=2,
+            ),
+            PlayerState(
+                id=9,
+                name="r",
+                avatar=1,
+                chips={100: 20},
+                bet_this_round=40,
+                total_bet_this_hand=40,
+                is_active=True,
+                is_folded=False,
+                is_all_in=False,
+                position=8,
+                hand=[],
+                hand_size=2,
+            )
     ]
 
     sample_actions = [
@@ -105,9 +192,10 @@ if __name__ == "__main__":
     ]
 
     test_state = GameState(
-        phase=GamePhase.FLOP,
+        phase=GamePhase.WAITING,
         hand_number=1,
         dealer_position=2,
+        owner_id=1,
         current_player_id=1,
         small_blind=10,
         big_blind=20,
@@ -123,9 +211,9 @@ if __name__ == "__main__":
     bottom_screen = GameBottomScreen()
     top_screen = TopScreen()
     screen_manager = ScreenManager(top_screen, bottom_screen)
-    screen_manager.update(test_state, player_id=1)
     running = True
     while running:
+        dt = clock.tick(60)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -134,8 +222,8 @@ if __name__ == "__main__":
                 action, amount = result
                 print(f"Kliknięto: {action} {amount}")
 
+        screen_manager.update(test_state, player_id=1, dt_ms=dt)
         screen_manager.draw(screen)
         pygame.display.flip()
-        clock.tick(60)
 
     pygame.quit()

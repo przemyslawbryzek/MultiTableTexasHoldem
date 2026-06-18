@@ -17,6 +17,7 @@ RED          = (220, 60, 60)
 GREEN        = (60, 210, 80)
 DIM          = (160, 160, 170)
 BTN_DISABLED = (90, 90, 95)
+OWNER_BTN_COLOR = (50, 130, 200)
 
 RIGHT_STACK_X  = 800 - 30
 STACK_Y        = 10
@@ -56,6 +57,7 @@ class GameBottomScreen:
 
         self.state:     GameState | None = None
         self.player_id: int | None       = None
+        self.owner_id:  int | None       = None
         self.bet_chips: dict[int, int] = {}
 
         self._right_chip_rects: list[tuple[pygame.Rect, int]] = []
@@ -68,7 +70,7 @@ class GameBottomScreen:
             return img
         return None
 
-    def _draw_button_bg(self, surface: pygame.Surface, rect: pygame.Rect, enabled: bool):
+    def _draw_button_bg(self, surface: pygame.Surface, rect: pygame.Rect, enabled: bool, color_override=None):
         if self.button_base is not None:
             scaled = pygame.transform.smoothscale(self.button_base, (rect.w, rect.h))
             if not enabled:
@@ -76,9 +78,14 @@ class GameBottomScreen:
                 dark.fill((90, 90, 90, 255), special_flags=pygame.BLEND_RGBA_MULT)
                 surface.blit(dark, rect.topleft)
             else:
-                surface.blit(scaled, rect.topleft)
+                if color_override:
+                    colored = scaled.copy()
+                    colored.fill((*color_override, 255), special_flags=pygame.BLEND_RGBA_MULT)
+                    surface.blit(colored, rect.topleft)
+                else:
+                    surface.blit(scaled, rect.topleft)
         else:
-            color = (70, 70, 90) if enabled else (40, 40, 45)
+            color = color_override if color_override else ((70, 70, 90) if enabled else (40, 40, 45))
             pygame.draw.rect(surface, color, rect, border_radius=4)
             pygame.draw.rect(surface, (0, 0, 0), rect, 1, border_radius=4)
 
@@ -86,6 +93,7 @@ class GameBottomScreen:
         prev_player_id = self.player_id
         self.state     = state
         self.player_id = player_id
+        self.owner_id  = state.owner_id
 
         if state.current_player_id != player_id:
             self.bet_chips = {}
@@ -128,11 +136,17 @@ class GameBottomScreen:
 
     def _available_action_set(self) -> set[str]:
         if not self.state:
-            return {"fold", "all-in"}
+            return set()
+
+        if self.state.phase == GamePhase.WAITING:
+            return set()
 
         my_player = self._my_player()
         if not my_player:
-            return {"fold", "all-in"}
+            return set()
+
+        if self.state.current_player_id != self.player_id:
+            return set()
 
         my_chip_total  = sum(v * a for v, a in my_player.chips.items())
         to_call        = max(0, self.state.highest_bet - my_player.bet_this_round)
@@ -249,6 +263,24 @@ class GameBottomScreen:
         return full_rect
 
     def _draw_buttons(self, surface: pygame.Surface):
+        if self.state.phase == GamePhase.WAITING:
+            if self.owner_id == self.player_id:
+                rect = pygame.Rect(CENTER_X - BUTTON_W // 2, BUTTON_AREA_Y, BUTTON_W, BUTTON_H)
+                self._draw_button_bg(surface, rect, enabled=True, color_override=OWNER_BTN_COLOR)
+                text = self.small_font.render("START", True, WHITE)
+                text_rect = text.get_rect(center=rect.center)
+                text_rect.centery -= 2
+                surface.blit(text, text_rect)
+                self._button_rects["start"] = rect
+                self._enabled_actions = {"start"}
+            else:
+                self._enabled_actions = set()
+            return
+
+        if self.state.current_player_id != self.player_id:
+            self._enabled_actions = set()
+            return
+
         available  = self._available_action_set()
         bet_amount = self._bet_total()
 
@@ -280,8 +312,6 @@ class GameBottomScreen:
             surface.blit(text, text_rect)
 
             self._button_rects[action_key] = rect
-            if enabled:
-                pass
 
         self._enabled_actions = {k for k, _, e in defs if e}
 
@@ -304,6 +334,10 @@ class GameBottomScreen:
         for action_key, rect in self._button_rects.items():
             if rect.collidepoint(pos) and action_key in getattr(self, "_enabled_actions", set()):
                 amount = self._bet_total()
+
+                if action_key == "start":
+                    self._clear_bet()
+                    return ("start", 0)
 
                 if action_key == "fold":
                     self._clear_bet()

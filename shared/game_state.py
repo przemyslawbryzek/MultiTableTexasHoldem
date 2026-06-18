@@ -6,6 +6,7 @@ from shared.enums import GameState as GamePhase, ActionType
 class PlayerState:
     id: int
     name: str
+    avatar: int
     chips: dict[int, int]
     bet_this_round: int
     total_bet_this_hand: int
@@ -48,6 +49,7 @@ class AvailableAction:
 @dataclass
 class GameState:
     phase: GamePhase
+    owner_id: int
     hand_number: int
     dealer_position: int
     current_player_id: int
@@ -84,6 +86,7 @@ class GameState:
         return cls(
             phase=GamePhase(data["game_state"]),
             hand_number=data.get("hand_number", 0),
+            owner_id=data.get("owner_id", 0),
             dealer_position=data["dealer_position"],
             current_player_id=data["current_player_id"],
             small_blind=data["small_blind"],
@@ -100,6 +103,7 @@ class GameState:
                 PlayerState(
                     id=p["id"],
                     name=p["name"],
+                    avatar=p["avatar"],
                     chips=p["chips"],
                     bet_this_round=p["bet_this_round"],
                     total_bet_this_hand=p.get("total_bet_this_hand", 0),

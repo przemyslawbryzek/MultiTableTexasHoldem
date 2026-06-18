@@ -149,12 +149,14 @@ class Server:
             player_name = msg.get("player_name", "Unknown")
             player_id = msg.get("player_id", fileno)
             big_blind = msg.get("big_blind", 20)
+            player_avatar = msg.get("player_avatar", 0)
 
             table_id = self.table_manager.create_table(
                 owner_fd=fileno,
                 owner_id=player_id,
                 owner_name=player_name,
                 big_blind=big_blind,
+                owner_avatar=player_avatar,
             )
             logging.info(f"Table {table_id} created by fd={fileno}")
             self._send(fileno, {
@@ -178,11 +180,13 @@ class Server:
             table_id = msg["table_id"]
             player_name = msg.get("player_name", "Unknown")
             player_id = msg.get("player_id", fileno)
+            player_avatar = msg.get("player_avatar", 0)
 
             self.table_manager.add_player_to_table(
                 table_id=table_id,
                 player_id=player_id,
                 player_name=player_name,
+                player_avatar=player_avatar,
                 client_fd=fileno,
             )
 
@@ -342,6 +346,7 @@ class Server:
                 PlayerState(
                     id=p.id,
                     name=p.name,
+                    avatar=p.avatar,
                     chips=p.chips.to_dict(),
                     bet_this_round=p.bet_this_round,
                     total_bet_this_hand=p.total_bet_this_hand,
@@ -373,6 +378,7 @@ class Server:
         game_state = GameState(
             phase=GamePhase(table.game_state.name),
             hand_number=0,
+            owner_id=table.owner_id,
             dealer_position=table.dealer_position,
             current_player_id=table.players[table.current_player_idx].id if table.game_state != GamePhase.WAITING else -1,
             small_blind=table.small_blind,

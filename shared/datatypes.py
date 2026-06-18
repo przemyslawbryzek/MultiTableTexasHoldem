@@ -126,6 +126,7 @@ class Chips:
 class Player:
     id: int
     name: str
+    avatar: int
     chips: Chips
     hand: list[Card]
     bet_this_round: int
@@ -135,9 +136,10 @@ class Player:
     is_all_in: bool
     does_have_acted_this_round: bool
 
-    def __init__(self, id: int, name: str, starting_chips: dict[int, int]):
+    def __init__(self, id: int, name: str, avatar: int, starting_chips: dict[int, int]):
         self.id = id
         self.name = name
+        self.avatar = avatar
         self.chips = Chips(starting_chips)
         self.hand = []
         self.is_active = True

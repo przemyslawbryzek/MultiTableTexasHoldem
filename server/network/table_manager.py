@@ -18,11 +18,12 @@ class TableManager:
         owner_fd: int,
         owner_id: int,
         owner_name: str,
+        owner_avatar: int,
         big_blind: int = 20,
     ) -> int:
         table_id = self._next_table_id
         self._next_table_id += 1
-        owner = Player(owner_id, owner_name, STARTING_CHIPS)
+        owner = Player(owner_id, owner_name, owner_avatar, STARTING_CHIPS)
         table = Table(owner, STARTING_CHIPS, big_blind)
         self.tables[table_id] = table
         self.table_to_fds[table_id] = [owner_fd]
@@ -50,13 +51,14 @@ class TableManager:
         table_id: int,
         player_id: int,
         player_name: str,
+        player_avatar: int,
         client_fd: int,
     ):
         if table_id not in self.tables:
             raise ValueError(f"Table {table_id} does not exist")
 
         table = self.tables[table_id]
-        player = Player(player_id, player_name, STARTING_CHIPS)
+        player = Player(player_id, player_name, player_avatar, STARTING_CHIPS)
         table.add_player(player)
 
         self.fd_to_player[client_fd] = (table_id, player_id)
