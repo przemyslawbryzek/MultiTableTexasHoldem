@@ -2,9 +2,27 @@ import socket
 import select
 import sys
 import logging
+from dataclasses import dataclass
 from server.utils import db, kdf
 from server.network.table_manager import TableManager
 from shared.protocol import Protocol, MessageType
+from shared.enums import GameState
+
+BUFFER_SIZE = 4096
+
+
+@dataclass
+class User:
+    id: int
+    username: str
+
+
+@dataclass
+class Conn:
+    fd: int
+    sock: socket.socket
+    buf: bytes
+    user: User | None
 
 
 class Server:
@@ -13,36 +31,33 @@ class Server:
         self.host = host
         self.port = port
         self.table_manager = TableManager()
-        self.fd_to_socket: dict[int, socket.socket] = {}
-        self.fd_to_buffer: dict[int, bytes] = {}
-        logging.basicConfig(
-            level=logging.INFO,
-            format="[%(asctime)s] %(levelname)s: %(message)s",
-            stream=sys.stdout,
-        )
+        self.conns: dict[int, Conn] = {}
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.server_socket.setblocking(False)
         self.server_socket.bind((self.host, self.port))
         self.server_socket.listen()
-
         self.epoll = select.epoll()
         self.epoll.register(self.server_socket.fileno(), select.EPOLLIN)
-
-        logging.info(f"Server started on {self.host}:{self.port}")
+        logging.basicConfig(
+            level=logging.INFO,
+            format="[%(asctime)s] %(levelname)s: %(message)s",
+            stream=sys.stdout,
+        )
+        logging.info(f"server started on {self.host}:{self.port}")
 
     def run(self):
-        logging.info("Server running, waiting for connections...")
+        logging.info("server running, waiting for connections...")
         try:
             while True:
                 events = self.epoll.poll(timeout=1)
-                for fileno, event in events:
-                    if fileno == self.server_socket.fileno():
+                for fd, event in events:
+                    if fd == self.server_socket.fileno():
                         self._accept_connection()
                     elif event & (select.EPOLLHUP | select.EPOLLERR):
-                        self._disconnect_client(fileno)
+                        self._disconnect_client(fd)
                     elif event & select.EPOLLIN:
-                        self._handle_client_data(fileno)
+                        self._handle_client_data(fd)
         finally:
             self._shutdown()
 
@@ -51,33 +66,29 @@ class Server:
             client_socket, addr = self.server_socket.accept()
             client_socket.setblocking(False)
             fd = client_socket.fileno()
-
-            self.fd_to_socket[fd] = client_socket
-            self.fd_to_buffer[fd] = b""
+            self.conns[fd] = Conn(fd, client_socket, b"", None)
             self.epoll.register(fd, select.EPOLLIN)
-
-            logging.info(f"New connection from {addr} (fd={fd})")
+            logging.info(f"new connection from {addr} (fd={fd})")
         except Exception as e:
-            logging.error(f"Accept error: {e}")
+            logging.error(f"accept error: {e}")
 
-    def _disconnect_client(self, fileno: int):
+    def _disconnect_client(self, fd: int):
         try:
-            self.epoll.unregister(fileno)
+            self.epoll.unregister(fd)
         except Exception:
             pass
-
-        sock = self.fd_to_socket.pop(fileno, None)
-        self.fd_to_buffer.pop(fileno, None)
-
-        if sock:
-            self.table_manager.remove_player_by_fd(fileno)
-            sock.close()
-            logging.info(f"Client disconnected (fd={fileno})")
+        conn = self.conns.pop(fd, None)
+        if not conn:
+            return
+        conn.sock.close()
+        logging.info(f"client disconnected (fd={fd})")
+        if conn.user:
+            self.table_manager.remove_player_by_fd(conn.fd)
 
     def _shutdown(self):
-        for sock in self.fd_to_socket.values():
+        for conn in self.conns.values():
             try:
-                sock.close()
+                conn.sock.close()
             except Exception:
                 pass
         try:
@@ -86,38 +97,40 @@ class Server:
         except Exception:
             pass
         self.server_socket.close()
-        logging.info("Server shutdown.")
+        logging.info("server shutdown")
 
-    def _handle_client_data(self, fileno: int):
-        sock = self.fd_to_socket.get(fileno)
-        if not sock:
+    def _handle_client_data(self, fd: int):
+        conn = self.conns.get(fd)
+        if not conn:
             return
-
         try:
-            chunk = sock.recv(4096)
+            chunk = conn.sock.recv(BUFFER_SIZE)
             if not chunk:
-                self._disconnect_client(fileno)
+                self._disconnect_client(fd)
                 return
-
-            self.fd_to_buffer[fileno] += chunk
+            conn.buf += chunk
             while True:
-                msg, self.fd_to_buffer[fileno] = Protocol.extract_message(
-                    self.fd_to_buffer[fileno]
-                )
+                msg, conn.buf = Protocol.extract_message(conn.buf)
                 if msg is None:
                     break
-                self._handle_message(fileno, msg)
-
+                self._handle_message(conn, msg)
         except ConnectionResetError:
-            self._disconnect_client(fileno)
+            self._disconnect_client(fd)
         except Exception as e:
-            logging.error(f"Error reading fd={fileno}: {e}")
-            self._disconnect_client(fileno)
+            logging.error(f"error reading fd={fd}: {e}")
+            self._disconnect_client(fd)
 
-    def _handle_message(self, fileno: int, msg: dict):
-        msg_type = msg.get("type")
-        logging.debug(f"fd={fileno} type={msg_type}")
+    def _extract_field(self, conn: Conn, msg: dict, name: str, t: type):
+        v = msg.get(name)
+        if type(v) is not t:
+            self._send_error(conn.fd, f"Missing or invalid field '{name}'")
+            return None
+        return v
 
+    def _handle_message(self, conn: Conn, msg: dict):
+        msg_type = self._extract_field(conn, msg, "type", str)
+        if not msg_type:
+            return
         handlers = {
             MessageType.CREATE_ACCOUNT: self._handle_create_account,
             MessageType.LOGIN: self._handle_login,
@@ -127,58 +140,99 @@ class Server:
             MessageType.START_TABLE: self._handle_start_table,
             MessageType.ACTION: self._handle_action,
         }
-
         handler = handlers.get(msg_type)
-        if handler:
-            handler(fileno, msg)
-        else:
-            self._send_error(fileno, f"Unknown message type: {msg_type}")
-
-    def _handle_create_account(self, fileno: int, msg: dict):
-        password = kdf.hash(msg["password"])
-        user = db.create_user(msg["username"], password)
-        if user is None:
-            # TODO: error handling
+        if handler is None:
+            self._send_error(conn.fd, f"Unknown message type: {msg_type}")
             return
+        logging.debug(f"fd={conn.fd} type={msg_type}")
+        require_auth = msg_type not in [
+            MessageType.CREATE_ACCOUNT,
+            MessageType.LOGIN,
+        ]
+        if require_auth and conn.user is None:
+            self._send_error(conn.fd, "Authentication required")
+            return
+        handler(conn, msg)
+
+    def _handle_create_account(self, conn: Conn, msg: dict):
+        username = self._extract_field(conn, msg, "username", str)
+        if not username:
+            return
+        password = self._extract_field(conn, msg, "password", str)
+        if not password:
+            return
+        hash = kdf.hash(password)
+        db.create_user(username, hash)
         self._send(
-            fileno,
+            conn.fd,
             {
                 "type": MessageType.CREATE_ACCOUNT_RESPONSE,
-                "message": "Account created",
+                "success": True,
+                "error": None,
             },
         )
 
-    def _handle_get_tables(self, fileno: int, msg: dict):
-        tables = self.table_manager.get_tables()
-        self._send(fileno, {"type": MessageType.GET_TABLES_RESPONSE, "tables": tables})
-
-    def _handle_login(self, fileno: int, msg: dict):
-        user = db.get_user(msg["username"])
+    def _handle_login(self, conn: Conn, msg: dict):
+        username = self._extract_field(conn, msg, "username", str)
+        if not username:
+            return
+        password = self._extract_field(conn, msg, "password", str)
+        if not password:
+            return
+        user = db.get_user(username)
+        ok = False
         if user is None:
-            kdf.verify("mock", user.password)
-            # TODO: error handling
-            return
-        ok = kdf.verify(msg["password"], user.password)
-        if not ok:
-            # TODO: error handling
-            return
-        self._send(fileno, {"type": MessageType.LOGIN_RESPONSE, "message": "Logged in"})
-
-    def _handle_create_table(self, fileno: int, msg: dict):
-        try:
-            player_name = msg.get("player_name", "Unknown")
-            player_id = msg.get("player_id", fileno)
-            big_blind = msg.get("big_blind", 20)
-
-            table_id = self.table_manager.create_table(
-                owner_fd=fileno,
-                owner_id=player_id,
-                owner_name=player_name,
-                big_blind=big_blind,
-            )
-            logging.info(f"Table {table_id} created by fd={fileno}")
+            kdf.hash("mock")
+        else:
+            ok = kdf.verify(password, user.password)
+        if ok:
+            conn.user = User(user.id, user.username)
             self._send(
-                fileno,
+                conn.fd,
+                {
+                    "type": MessageType.LOGIN_RESPONSE,
+                    "success": True,
+                    "player_id": user.id,
+                    "player_name": user.username,
+                    "error": None,
+                },
+            )
+        else:
+            self._send(
+                conn.fd,
+                {
+                    "type": MessageType.LOGIN_RESPONSE,
+                    "success": False,
+                    "player_id": None,
+                    "player_name": None,
+                    "error": "Invalid credentials",
+                },
+            )
+
+    def _handle_get_tables(self, conn: Conn, _: dict):
+        tables = self.table_manager.get_tables()
+        self._send(
+            conn.fd,
+            {
+                "type": MessageType.GET_TABLES_RESPONSE,
+                "tables": tables,
+            },
+        )
+
+    def _handle_create_table(self, conn: Conn, msg: dict):
+        try:
+            big_blind = self._extract_field(conn, msg, "big_blind", int)
+            if big_blind is None:
+                big_blind = 20
+            table_id = self.table_manager.create_table(
+                conn.fd,
+                conn.user.id,
+                conn.user.username,
+                big_blind,
+            )
+            logging.info(f"table {table_id} created by fd={conn.fd}")
+            self._send(
+                conn.fd,
                 {
                     "type": MessageType.CREATE_TABLE_RESPONSE,
                     "success": True,
@@ -187,10 +241,9 @@ class Server:
                 },
             )
             self._broadcast_table_state(table_id)
-
         except Exception as e:
             self._send(
-                fileno,
+                conn.fd,
                 {
                     "type": MessageType.CREATE_TABLE_RESPONSE,
                     "success": False,
@@ -199,21 +252,18 @@ class Server:
                 },
             )
 
-    def _handle_join_table(self, fileno: int, msg: dict):
+    def _handle_join_table(self, conn: Conn, msg: dict):
+        table_id = self._extract_field(conn, msg, "table_id", int)
+        if not table_id:
+            return
         try:
-            table_id = msg["table_id"]
-            player_name = msg.get("player_name", "Unknown")
-            player_id = msg.get("player_id", fileno)
-
+            player_id = conn.user.id
+            player_name = conn.user.username
             self.table_manager.add_player_to_table(
-                table_id=table_id,
-                player_id=player_id,
-                player_name=player_name,
-                client_fd=fileno,
+                table_id, player_id, player_name, conn.fd
             )
-
             self._send(
-                fileno,
+                conn.fd,
                 {
                     "type": MessageType.JOIN_TABLE_RESPONSE,
                     "success": True,
@@ -221,7 +271,6 @@ class Server:
                     "error": None,
                 },
             )
-
             table = self.table_manager.get_table(table_id)
             joined_msg = {
                 "type": MessageType.PLAYER_JOINED,
@@ -231,13 +280,12 @@ class Server:
                     "chips": table.players[-1].chips.total_value(),
                 },
             }
-            self._broadcast(table_id, joined_msg, exclude_fd=fileno)
+            self._broadcast(table_id, joined_msg, exclude_fd=conn.fd)
             self._broadcast_table_state(table_id)
-            logging.info(f"Player {player_name} joined table {table_id}")
-
+            logging.info(f"player {player_id} joined table {table_id}")
         except Exception as e:
             self._send(
-                fileno,
+                conn.fd,
                 {
                     "type": MessageType.JOIN_TABLE_RESPONSE,
                     "success": False,
@@ -246,39 +294,37 @@ class Server:
                 },
             )
 
-    def _handle_start_table(self, fileno: int, msg: dict):
+    def _handle_start_table(self, conn: Conn, _):
         try:
-            table_id = self.table_manager.get_table_id_by_fd(fileno)
+            table_id = self.table_manager.get_table_id_by_fd(conn.fd)
             if table_id is None:
-                self._send_error(fileno, "You are not at a table")
+                self._send_error(conn.fd, "You are not at a table")
                 return
-
             table = self.table_manager.get_table(table_id)
             table.start_new_hand()
-
-            logging.info(f"Hand started at table {table_id}")
+            logging.info(f"hand started at table {table_id}")
             self._broadcast(table_id, {"type": MessageType.GAME_START})
             self._broadcast_table_state(table_id)
-
         except Exception as e:
-            self._send_error(fileno, str(e))
+            self._send_error(conn.fd, str(e))
 
-    def _handle_action(self, fileno: int, msg: dict):
+    def _handle_action(self, conn: Conn, msg: dict):
+        action = self._extract_field(conn, msg, "action", str)
+        if not action:
+            return
+        amount = self._extract_field(conn, msg, "amount", int)
+        if not amount:
+            amount = 0
         try:
-            table_id = self.table_manager.get_table_id_by_fd(fileno)
+            player_id = conn.user.id
+            table_id = self.table_manager.get_table_id_by_fd(conn.fd)
             if table_id is None:
-                self._send_error(fileno, "You are not at a table")
+                self._send_error(conn.fd, "You are not at a table")
                 return
-
-            player_id = self.table_manager.get_player_id_by_fd(fileno)
-            action = msg.get("action")
-            amount = msg.get("amount", 0)
-
             table = self.table_manager.get_table(table_id)
             table.process_player_action(player_id, action, amount)
-
             self._send(
-                fileno,
+                conn.fd,
                 {
                     "type": MessageType.ACTION_RESPONSE,
                     "success": True,
@@ -287,40 +333,33 @@ class Server:
                     "error": None,
                 },
             )
-
             logging.info(
-                f"Player {player_id} action={action} amount={amount} table={table_id}"
+                f"player {player_id} action={action} amount={amount} table={table_id}"
             )
-
-            from shared.enums import GameState
-
             if table.game_state == GameState.WAITING:
                 self._broadcast_hand_end(table_id)
             else:
                 self._broadcast_table_state(table_id)
-
         except ValueError as e:
             self._send(
-                fileno,
+                conn.fd,
                 {
                     "type": MessageType.ACTION_RESPONSE,
                     "success": False,
-                    "action": msg.get("action"),
-                    "amount": msg.get("amount", 0),
+                    "action": action,
+                    "amount": amount,
                     "error": str(e),
                 },
             )
         except Exception as e:
-            logging.error(f"Action error: {e}")
-            self._send_error(fileno, "Internal server error")
+            logging.error(f"action error: {e}")
+            self._send_error(conn.fd, "Internal server error")
 
     def _broadcast_table_state(self, table_id: int):
         table = self.table_manager.get_table(table_id)
         if not table:
             return
-
         fds = self.table_manager.get_fds_at_table(table_id)
-
         for fd in fds:
             player_id = self.table_manager.get_player_id_by_fd(fd)
             state = self._build_state_message(table, viewer_id=player_id)
@@ -330,7 +369,6 @@ class Server:
         table = self.table_manager.get_table(table_id)
         if not table:
             return
-
         winners = table.get_winner()
         winner_info = [
             {
@@ -341,14 +379,11 @@ class Server:
             }
             for w in winners
         ]
-
         msg = {
             "type": MessageType.HAND_END,
             "winners": winner_info,
         }
-
         self._broadcast(table_id, msg)
-
         self._broadcast_table_state(table_id)
 
     def _broadcast(self, table_id: int, msg: dict, exclude_fd: int = None):
@@ -357,21 +392,18 @@ class Server:
             if fd != exclude_fd:
                 self._send(fd, msg)
 
-    def _send(self, fileno: int, msg: dict):
-        sock = self.fd_to_socket.get(fileno)
-        if not sock:
-            return
+    def _send(self, conn: Conn, msg: dict):
         try:
             data = Protocol.encode_message(msg)
-            sock.sendall(data)
+            conn.sock.sendall(data)
         except Exception as e:
-            logging.error(f"Send error fd={fileno}: {e}")
-            self._disconnect_client(fileno)
+            logging.error(f"send error fd={conn.fd}: {e}")
+            self._disconnect_client(conn.fd)
 
-    def _send_error(self, fileno: int, message: str):
-        logging.warning(f"Error to fd={fileno}: {message}")
+    def _send_error(self, conn: Conn, message: str):
+        logging.warning(f"error to fd={conn.fd}: {message}")
         self._send(
-            fileno,
+            conn,
             {
                 "type": MessageType.ERROR,
                 "message": message,
@@ -394,7 +426,6 @@ class Server:
                     "hand_size": len(p.hand),
                 }
             )
-
         return {
             "type": MessageType.STATE,
             "game_state": table.game_state.name,

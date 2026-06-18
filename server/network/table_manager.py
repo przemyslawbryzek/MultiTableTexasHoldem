@@ -1,4 +1,3 @@
-import sys
 import logging
 from server.game.table import Table
 from shared.datatypes import Player
@@ -8,7 +7,6 @@ STARTING_CHIPS = {1000: 0, 500: 0, 100: 5, 50: 10, 25: 0, 10: 50, 5: 0, 1: 0}
 
 
 class TableManager:
-
     def __init__(self):
         self.tables: dict[int, Table] = {}
         self.fd_to_player: dict[int, tuple[int, int]] = {}
@@ -28,10 +26,8 @@ class TableManager:
         table = Table(owner, STARTING_CHIPS, big_blind)
         self.tables[table_id] = table
         self.table_to_fds[table_id] = [owner_fd]
-
         self.fd_to_player[owner_fd] = (table_id, owner_id)
-
-        logging.info(f"Table {table_id} created by player {owner_name}")
+        logging.info(f"table {table_id} created by player {owner_name}")
         return table_id
 
     def delete_table(self, table_id: int):
@@ -40,9 +36,8 @@ class TableManager:
         fds = self.table_to_fds.pop(table_id, [])
         for fd in fds:
             self.fd_to_player.pop(fd, None)
-
         del self.tables[table_id]
-        logging.info(f"Table {table_id} deleted")
+        logging.info(f"table {table_id} deleted")
 
     def get_table(self, table_id: int) -> Table | None:
         return self.tables.get(table_id)
@@ -56,44 +51,34 @@ class TableManager:
     ):
         if table_id not in self.tables:
             raise ValueError(f"Table {table_id} does not exist")
-
         table = self.tables[table_id]
         player = Player(player_id, player_name, STARTING_CHIPS)
         table.add_player(player)
-
         self.fd_to_player[client_fd] = (table_id, player_id)
         self.table_to_fds.setdefault(table_id, []).append(client_fd)
-
-        logging.info(f"Player {player_name} added to table {table_id}")
+        logging.info(f"player {player_name} added to table {table_id}")
 
     def remove_player_by_fd(self, fd: int):
         if fd not in self.fd_to_player:
             return
-
         table_id, player_id = self.fd_to_player.pop(fd)
         table = self.tables.get(table_id)
-
         if table:
-            from shared.enums import GameState
-
             if table.game_state != GameState.WAITING:
                 current = table.players[table.current_player_idx]
                 if current.id == player_id:
                     try:
                         table.process_player_action(player_id, "fold")
-                        logging.info(f"Auto-fold for disconnected player {player_id}")
+                        logging.info(f"auto-fold for disconnected player {player_id}")
                     except Exception:
                         pass
-
             table.remove_player(player_id)
-
             fds = self.table_to_fds.get(table_id, [])
             if fd in fds:
                 fds.remove(fd)
-
             if not table.players:
                 self.delete_table(table_id)
-                logging.info(f"Table {table_id} deleted (empty)")
+                logging.info(f"table {table_id} deleted")
 
     def get_table_id_by_fd(self, fd: int) -> int | None:
         mapping = self.fd_to_player.get(fd)

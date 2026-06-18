@@ -399,11 +399,11 @@ Manages all active tables and maps TCP file descriptors to players.
 ### Client → Server messages
 
 ```json
-{"type": "login", "username": "Alice", "password": "secret"}
 {"type": "create_account", "username": "Alice", "password": "secret"}
+{"type": "login", "username": "Alice", "password": "secret"}
 {"type": "get_tables"}
-{"type": "create_table", "player_id": 1, "player_name": "Alice", "big_blind": 20}
-{"type": "join_table", "table_id": 3, "player_id": 1, "player_name": "Alice"}
+{"type": "create_table", "big_blind": 20}
+{"type": "join_table", "table_id": 3}
 {"type": "start_table"}
 {"type": "action", "action": "raise", "amount": 100}
 {"type": "action", "action": "fold"}
@@ -412,16 +412,17 @@ Manages all active tables and maps TCP file descriptors to players.
 ### Server → Client messages
 
 ```json
+{"type": "create_account_response", "success": true, "error": null}
 {"type": "login_response", "success": true, "player_id": 42, "player_name": "Alice", "error": null}
+{"type": "get_tables_response", "tables": [{"table_id": 1, "owner": "Alice", "num_players": 2, "big_blind": 20, "game_state": "WAITING"}]}
 {"type": "create_table_response", "success": true, "table_id": 3, "error": null}
 {"type": "join_table_response", "success": true, "table_id": 3, "error": null}
 {"type": "action_response", "success": true, "action": "raise", "amount": 100, "error": null}
 {"type": "action_response", "success": false, "action": "check", "error": "Cannot check, must call or raise"}
-{"type": "get_tables_response", "tables": [{"table_id": 1, "owner": "Alice", "num_players": 2, "big_blind": 20, "game_state": "WAITING"}]}
 {"type": "game_start"}
 {"type": "player_joined", "player": {"id": 2, "name": "Bob", "chips": 1500}}
 {"type": "player_left", "player_id": 2, "player_name": "Bob", "reason": "disconnected"}
-{"type": "hand_end", "winners": [...], "all_hands": [...]}
+{"type": "hand_end", "winners": [/* ... */], "all_hands": [/* ... */]}
 {"type": "error", "message": "Table 99 does not exist"}
 {"type": "game_state",
   "game_state": "FLOP",
