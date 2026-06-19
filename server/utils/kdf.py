@@ -9,7 +9,7 @@ n = 16384
 ln = int(math.log2(n))
 r = 8
 p = 1
-maxmem = 128 * n * r * p
+maxmem = 140 * n * r * p
 saltlen = 32
 hashlen = 32
 

@@ -5,6 +5,7 @@ import logging
 from dataclasses import dataclass
 from server.utils import db, kdf
 from server.network.table_manager import TableManager
+from shared import discovery
 from shared.protocol import Protocol
 from shared.enums import GameState, MessageType
 
@@ -37,8 +38,10 @@ class Server:
         self.server_socket.setblocking(False)
         self.server_socket.bind((self.host, self.port))
         self.server_socket.listen()
+        self.discovery_socket = discovery.join_membership(blocking=False)
         self.epoll = select.epoll()
         self.epoll.register(self.server_socket.fileno(), select.EPOLLIN)
+        self.epoll.register(self.discovery_socket.fileno(), select.EPOLLIN)
         logging.basicConfig(
             level=logging.INFO,
             format="[%(asctime)s] %(levelname)s: %(message)s",
@@ -50,10 +53,12 @@ class Server:
         logging.info("server running, waiting for connections...")
         try:
             while True:
-                events = self.epoll.poll(timeout=1)
+                events = self.epoll.poll()
                 for fd, event in events:
                     if fd == self.server_socket.fileno():
                         self._accept_connection()
+                    elif fd == self.discovery_socket.fileno():
+                        discovery.probe_response(self.discovery_socket)
                     elif event & (select.EPOLLHUP | select.EPOLLERR):
                         self._disconnect_client(fd)
                     elif event & select.EPOLLIN:
