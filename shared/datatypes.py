@@ -17,6 +17,21 @@ class Card:
         rank_str = {11: "J", 12: "Q", 13: "K", 14: "A"}.get(self.rank, str(self.rank))
         suit_str = ["♠", "♥", "♦", "♣"][self.suit]
         return f"{rank_str}{suit_str}"
+    @staticmethod
+    def str_to_card(card_str: str) -> 'Card':
+        rank_str = card_str[:-1]
+        suit_str = card_str[-1]
+        
+        rank_map = {'J': 11, 'Q': 12, 'K': 13, 'A': 14}
+        if rank_str in rank_map:
+            rank = rank_map[rank_str]
+        else:
+            rank = int(rank_str)
+        
+        suit_map = {'♠': 0, '♥': 1, '♦': 2, '♣': 3}
+        suit = suit_map[suit_str]
+        
+        return Card(rank, suit)
 
 
 class Chip:
@@ -113,6 +128,7 @@ class Chips:
 class Player:
     id: int
     name: str
+    avatar: int
     chips: Chips
     hand: list[Card]
     bet_this_round: int
@@ -122,9 +138,10 @@ class Player:
     is_all_in: bool
     does_have_acted_this_round: bool
 
-    def __init__(self, id: int, name: str, starting_chips: dict[int, int]):
+    def __init__(self, id: int, name: str, avatar: int, starting_chips: dict[int, int]):
         self.id = id
         self.name = name
+        self.avatar = avatar
         self.chips = Chips(starting_chips)
         self.hand = []
         self.is_active = True

@@ -246,6 +246,83 @@ class Table:
         self.deal_hole_cards()
         self.game_state = GameState.PRE_FLOP
 
+    def get_available_actions(self, player_id: int) -> list[dict]:
+        if self.game_state == GameState.WAITING:
+            return []
+        if self.players[self.current_player_idx].id != player_id:
+            return []
+        player = self.get_player_by_id(player_id)
+        if not player or player.is_folded or player.is_all_in:
+            return []
+        actions = []
+        if player.bet_this_round < self.highest_bet:
+            call_amount = self.highest_bet - player.bet_this_round
+            if call_amount <= player.chips.total_value():
+                actions.append({
+                    "action": "call",
+                    "min_amount": call_amount,
+                    "max_amount": call_amount,
+                    "label": f"Call ${call_amount}",
+                })
+            else:
+                pass
+            max_possible = player.chips.total_value() + player.bet_this_round
+            if max_possible > self.highest_bet:
+                min_raise = self.highest_bet + self.last_raise if self.highest_bet > 0 else self.big_blind
+                if min_raise <= max_possible:
+                    actions.append({
+                        "action": "raise",
+                        "min_amount": min_raise,
+                        "max_amount": max_possible,
+                        "label": "Raise",
+                    })
+            if player.chips.total_value() > 0:
+                actions.append({
+                    "action": "all-in",
+                    "min_amount": player.chips.total_value(),
+                    "max_amount": player.chips.total_value(),
+                    "label": f"All-in ${player.chips.total_value()}",
+                })
+            actions.append({
+                "action": "fold",
+                "min_amount": 0,
+                "max_amount": 0,
+                "label": "Fold",
+            })
+
+        else:
+            actions.append({
+                "action": "check",
+                "min_amount": 0,
+                "max_amount": 0,
+                "label": "Check",
+            })
+            max_possible = player.chips.total_value() + player.bet_this_round
+            if max_possible > self.highest_bet:
+                min_raise = self.highest_bet + self.last_raise if self.highest_bet > 0 else self.big_blind
+                if min_raise <= max_possible:
+                    actions.append({
+                        "action": "raise",
+                        "min_amount": min_raise,
+                        "max_amount": max_possible,
+                        "label": "Raise",
+                    })
+            if player.chips.total_value() > 0:
+                actions.append({
+                    "action": "all-in",
+                    "min_amount": player.chips.total_value(),
+                    "max_amount": player.chips.total_value(),
+                    "label": f"All-in ${player.chips.total_value()}",
+                })
+            actions.append({
+                "action": "fold",
+                "min_amount": 0,
+                "max_amount": 0,
+                "label": "Fold",
+            })
+
+        return actions
+
     def process_player_action(self, player_id: int, action: str, amount: int = 0):
         if player_id != self.players[self.current_player_idx].id:
             raise ValueError("It's not this player's turn")
