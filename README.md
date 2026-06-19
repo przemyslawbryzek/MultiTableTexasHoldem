@@ -3,12 +3,13 @@
 ## `shared.datatypes`
 
 ### `Card`
+
 Represents a single playing card.
 
-| Attribute | Type | Description |
-|-----------|------|-------------|
-| `rank` | `int` | 2–14 (11=J, 12=Q, 13=K, 14=A) |
-| `suit` | `int` | 0=♠, 1=♥, 2=♦, 3=♣ |
+| Attribute | Type  | Description                   |
+| --------- | ----- | ----------------------------- |
+| `rank`    | `int` | 2–14 (11=J, 12=Q, 13=K, 14=A) |
+| `suit`    | `int` | 0=♠, 1=♥, 2=♦, 3=♣            |
 
 ```python
 from shared.datatypes import Card
@@ -21,29 +22,31 @@ Constructor raises `ValueError` for out-of-range values.
 ---
 
 ### `Chip`
+
 Single chip denomination.
 
-| Attribute | Type | Description |
-|-----------|------|-------------|
-| `value` | `int` | One of: 1, 5, 10, 25, 50, 100, 500, 1000 |
-| `amount` | `int` | Number of chips of this denomination |
+| Attribute | Type  | Description                              |
+| --------- | ----- | ---------------------------------------- |
+| `value`   | `int` | One of: 1, 5, 10, 25, 50, 100, 500, 1000 |
+| `amount`  | `int` | Number of chips of this denomination     |
 
 ---
 
 ### `Chips`
+
 Collection of chips across all denominations.
 
 Constructor: `Chips(starting_amount: dict[int, int] | list[Chip] | None)`
 
-| Method | Description |
-|--------|-------------|
-| `total_value() -> int` | Total cash value |
-| `add_chips(value, amount)` | Add chips of one denomination |
-| `add_amount(amount: int)` | Add chips auto-broken into denominations |
-| `remove_chips(value, amount)` | Remove chips (raises if not enough) |
-| `remove_amount(amount: int)` | Remove chips auto-broken into denominations |
+| Method                         | Description                                    |
+| ------------------------------ | ---------------------------------------------- |
+| `total_value() -> int`         | Total cash value                               |
+| `add_chips(value, amount)`     | Add chips of one denomination                  |
+| `add_amount(amount: int)`      | Add chips auto-broken into denominations       |
+| `remove_chips(value, amount)`  | Remove chips (raises if not enough)            |
+| `remove_amount(amount: int)`   | Remove chips auto-broken into denominations    |
 | `int_to_chips(amount) -> dict` | Decompose integer into available denominations |
-| `to_dict() -> dict` | Serialize to `{value: amount}` dict |
+| `to_dict() -> dict`            | Serialize to `{value: amount}` dict            |
 
 ```python
 from shared.datatypes import Chips
@@ -56,32 +59,34 @@ print(chips.total_value())         # 975
 ---
 
 ### `Player`
+
 Represents a player at the table.
 
 Constructor: `Player(id: int, name: str, starting_chips: dict[int, int])`
 
-| Attribute | Type | Description |
-|-----------|------|-------------|
-| `id` | `int` | Unique player ID |
-| `name` | `str` | Display name |
-| `chips` | `Chips` | Current chip stack |
-| `hand` | `list[Card]` | Hole cards (max 2) |
-| `bet_this_round` | `int` | Amount bet in current betting round |
-| `total_bet_this_hand` | `int` | Total bet across all rounds this hand |
-| `is_active` | `bool` | False if eliminated (no chips) |
-| `is_folded` | `bool` | True if folded this hand |
-| `is_all_in` | `bool` | True if all-in |
+| Attribute             | Type         | Description                           |
+| --------------------- | ------------ | ------------------------------------- |
+| `id`                  | `int`        | Unique player ID                      |
+| `name`                | `str`        | Display name                          |
+| `chips`               | `Chips`      | Current chip stack                    |
+| `hand`                | `list[Card]` | Hole cards (max 2)                    |
+| `bet_this_round`      | `int`        | Amount bet in current betting round   |
+| `total_bet_this_hand` | `int`        | Total bet across all rounds this hand |
+| `is_active`           | `bool`       | False if eliminated (no chips)        |
+| `is_folded`           | `bool`       | True if folded this hand              |
+| `is_all_in`           | `bool`       | True if all-in                        |
 
-| Method | Description |
-|--------|-------------|
+| Method               | Description                                |
+| -------------------- | ------------------------------------------ |
 | `receive_card(card)` | Add card to hand (max 2, raises otherwise) |
-| `clear_hand()` | Empty hand |
+| `clear_hand()`       | Empty hand                                 |
 
 ---
 
 ## `shared.enums`
 
 ### `GameState`
+
 ```python
 WAITING    # Between hands
 PRE_FLOP   # Hole cards dealt, first betting round
@@ -92,6 +97,7 @@ SHOWDOWN   # Hands revealed, pot distributed
 ```
 
 ### `MessageType`
+
 ```python
 # Client → Server
 ACTION           # Game action (fold/check/call/raise/all-in)
@@ -120,6 +126,7 @@ ERROR            # Error message
 ```
 
 ### `ActionType`
+
 ```python
 FOLD / CHECK / CALL / RAISE / ALL_IN
 ```
@@ -136,9 +143,9 @@ Length-prefixed JSON framing over TCP.
 
 Handles TCP stream fragmentation — messages may arrive split across multiple `recv()` calls.
 
-| Method | Description |
-|--------|-------------|
-| `Protocol.encode_message(msg: dict) -> bytes` | Serialize dict to framed bytes |
+| Method                                                     | Description                                       |
+| ---------------------------------------------------------- | ------------------------------------------------- |
+| `Protocol.encode_message(msg: dict) -> bytes`              | Serialize dict to framed bytes                    |
 | `Protocol.extract_message(buffer: bytes) -> (dict, bytes)` | Extract one message from buffer, return remainder |
 
 ```python
@@ -158,13 +165,14 @@ msg, buffer = Protocol.extract_message(buffer)
 ## `server.game.deck`
 
 ### `Deck`
+
 Standard 52-card deck.
 
-| Method | Description |
-|--------|-------------|
-| `reset()` | Rebuild and shuffle full 52-card deck |
-| `deal_card() -> Card` | Pop one card (raises `ValueError` if empty) |
-| `deal_cards(n: int) -> list[Card]` | Deal n cards |
+| Method                             | Description                                 |
+| ---------------------------------- | ------------------------------------------- |
+| `reset()`                          | Rebuild and shuffle full 52-card deck       |
+| `deal_card() -> Card`              | Pop one card (raises `ValueError` if empty) |
+| `deal_cards(n: int) -> list[Card]` | Deal n cards                                |
 
 ```python
 from server.game.deck import Deck
@@ -177,34 +185,40 @@ card = d.deal_card()
 ## `server.game.hand_evaluator`
 
 ### `HandEvaluator`
+
 All methods are `@staticmethod`.
 
 #### `evaluate_hand(player_cards, community_cards) -> int`
+
 Returns hand rank (higher = stronger):
 
-| Return | Hand |
-|--------|------|
-| `-1` | High Card |
-| `0` | One Pair |
-| `1` | Two Pair |
-| `2` | Three of a Kind |
-| `3` | Straight |
-| `4` | Flush |
-| `5` | Full House |
-| `6` | Four of a Kind |
-| `7` | Straight Flush |
-| `8` | Royal Flush |
+| Return | Hand            |
+| ------ | --------------- |
+| `-1`   | High Card       |
+| `0`    | One Pair        |
+| `1`    | Two Pair        |
+| `2`    | Three of a Kind |
+| `3`    | Straight        |
+| `4`    | Flush           |
+| `5`    | Full House      |
+| `6`    | Four of a Kind  |
+| `7`    | Straight Flush  |
+| `8`    | Royal Flush     |
 
 #### `hand_comparator(hand1, hand2, public_cards) -> int`
+
 Tie-break two hands of the same rank. Returns `1` (hand1 wins), `-1` (hand2 wins), `0` (tie).
 
 #### Boolean helpers
+
 `is_royal_flush`, `is_straight_flush`, `is_four_of_a_kind`, `is_full_house`, `is_flush`, `is_straight`, `is_three_of_a_kind`, `is_two_pair`, `is_one_pair`
 
 #### Rank getters
+
 `get_straight_high_card`, `get_straight_flush_high_card`, `get_four_of_a_kind_rank`, `get_flush_ranks`, `get_flush_high_card`, `get_three_of_a_kind_rank`, `get_two_pair_ranks`, `get_one_pair_rank`, `get_full_house_pair_rank`
 
 **Edge cases:**
+
 - Ace-low straight (A-2-3-4-5) is supported; `get_straight_high_card` returns `5`
 - Flush comparison uses all 5 flush-suit ranks (not just top card)
 - Full house: trips rank compared first, then pair rank
@@ -224,43 +238,45 @@ rank = HandEvaluator.evaluate_hand(player, public)
 ## `server.game.table`
 
 ### `Table`
+
 Core game logic. Manages one poker hand from start to showdown including side pots.
 
 Constructor: `Table(owner: Player, starting_chips: dict[int, int], big_blind: int)`
 
 #### Key attributes
 
-| Attribute | Type | Description |
-|-----------|------|-------------|
-| `players` | `list[Player]` | All players at table |
-| `community_cards` | `list[Card]` | 0–5 revealed cards |
-| `pot` | `Chips` | Total chips in main pot |
-| `game_state` | `GameState` | Current phase |
-| `dealer_position` | `int` | Index of dealer |
-| `current_player_idx` | `int` | Index of player to act |
-| `highest_bet` | `int` | Current bet to call |
-| `last_raise` | `int` | Size of last raise (for min-raise) |
-| `small_blind` | `int` | Small blind amount |
-| `big_blind` | `int` | Big blind amount |
+| Attribute            | Type           | Description                        |
+| -------------------- | -------------- | ---------------------------------- |
+| `players`            | `list[Player]` | All players at table               |
+| `community_cards`    | `list[Card]`   | 0–5 revealed cards                 |
+| `pot`                | `Chips`        | Total chips in main pot            |
+| `game_state`         | `GameState`    | Current phase                      |
+| `dealer_position`    | `int`          | Index of dealer                    |
+| `current_player_idx` | `int`          | Index of player to act             |
+| `highest_bet`        | `int`          | Current bet to call                |
+| `last_raise`         | `int`          | Size of last raise (for min-raise) |
+| `small_blind`        | `int`          | Small blind amount                 |
+| `big_blind`          | `int`          | Big blind amount                   |
 
 #### Methods
 
-| Method | Description |
-|--------|-------------|
-| `add_player(player)` | Add player (max 9, only in WAITING) |
-| `remove_player(player_id)` | Remove player by ID |
-| `get_player_by_id(player_id)` | Lookup player |
-| `get_active_players()` | Players who can still bet (not folded, not all-in) |
-| `get_players_in_hand()` | Players still in hand (including all-in) |
-| `start_new_hand()` | Begin new hand (deals cards, posts blinds) |
-| `process_player_action(player_id, action, amount)` | Handle fold/check/call/raise/all-in |
-| `advance_game_state()` | Move to next phase (flop/turn/river/showdown) |
-| `get_winner() -> list[Player]` | Determine winner(s) using hand evaluation |
-| `calculate_side_pots() -> list[SidePot]` | Compute side pots from all-in situations |
-| `distribute_pots()` | Award each side pot to its winner(s) |
-| `clear_table()` | Reset for next hand |
+| Method                                             | Description                                        |
+| -------------------------------------------------- | -------------------------------------------------- |
+| `add_player(player)`                               | Add player (max 9, only in WAITING)                |
+| `remove_player(player_id)`                         | Remove player by ID                                |
+| `get_player_by_id(player_id)`                      | Lookup player                                      |
+| `get_active_players()`                             | Players who can still bet (not folded, not all-in) |
+| `get_players_in_hand()`                            | Players still in hand (including all-in)           |
+| `start_new_hand()`                                 | Begin new hand (deals cards, posts blinds)         |
+| `process_player_action(player_id, action, amount)` | Handle fold/check/call/raise/all-in                |
+| `advance_game_state()`                             | Move to next phase (flop/turn/river/showdown)      |
+| `get_winner() -> list[Player]`                     | Determine winner(s) using hand evaluation          |
+| `calculate_side_pots() -> list[SidePot]`           | Compute side pots from all-in situations           |
+| `distribute_pots()`                                | Award each side pot to its winner(s)               |
+| `clear_table()`                                    | Reset for next hand                                |
 
 #### `process_player_action` valid actions
+
 ```python
 "fold"    # Give up hand
 "check"   # Pass (only if no bet to call)
@@ -272,6 +288,7 @@ Constructor: `Table(owner: Player, starting_chips: dict[int, int], big_blind: in
 Raises `ValueError` for invalid actions (wrong turn, illegal check, insufficient chips, raise below minimum).
 
 #### Side pot example
+
 ```
 Alice: all-in  100   →  eligible for pot up to 100×3
 Bob:   all-in  300   →  eligible for pot up to 300×3
@@ -300,6 +317,7 @@ table.process_player_action(1, "check", 0)
 ## `server.network.server`
 
 ### `Server`
+
 Concurrent TCP server using Linux `epoll`.
 
 Constructor: `Server(host='0.0.0.0', port=7777)`
@@ -343,6 +361,7 @@ Client                          Server
 ```
 
 #### Notes
+
 - Each player receives a **personalised** `game_state` — only their own hole cards are included; opponents show `hand: [], hand_size: 2`
 - On disconnect: player is **auto-folded** if it is their turn, then removed
 - Empty tables are deleted automatically
@@ -352,53 +371,58 @@ Client                          Server
 ## `server.network.table_manager`
 
 ### `TableManager`
+
 Manages all active tables and maps TCP file descriptors to players.
 
-| Method | Description |
-|--------|-------------|
-| `create_table(owner_fd, owner_id, owner_name, big_blind)` | Create table, return `table_id` |
-| `delete_table(table_id)` | Delete table and clean up all mappings |
-| `get_table(table_id)` | Get `Table` by ID |
-| `add_player_to_table(table_id, player_id, player_name, client_fd)` | Add player |
-| `remove_player_by_fd(fd)` | Handle disconnect (auto-fold + cleanup) |
-| `get_table_id_by_fd(fd)` | Which table is this fd at? |
-| `get_player_id_by_fd(fd)` | Which player is this fd? |
-| `get_fds_at_table(table_id)` | All fds at a table (for broadcast) |
-| `get_tables()` | List of joinable tables (WAITING state only) |
+| Method                                                             | Description                                  |
+| ------------------------------------------------------------------ | -------------------------------------------- |
+| `create_table(owner_fd, owner_id, owner_name, big_blind)`          | Create table, return `table_id`              |
+| `delete_table(table_id)`                                           | Delete table and clean up all mappings       |
+| `get_table(table_id)`                                              | Get `Table` by ID                            |
+| `add_player_to_table(table_id, player_id, player_name, client_fd)` | Add player                                   |
+| `remove_player_by_fd(fd)`                                          | Handle disconnect (auto-fold + cleanup)      |
+| `get_table_id_by_fd(fd)`                                           | Which table is this fd at?                   |
+| `get_player_id_by_fd(fd)`                                          | Which player is this fd?                     |
+| `get_fds_at_table(table_id)`                                       | All fds at a table (for broadcast)           |
+| `get_tables()`                                                     | List of joinable tables (WAITING state only) |
 
 ---
 
 ## Network Protocol
 
 ### Framing
+
 ```
 [LENGTH: 4 bytes, big-endian uint32][JSON payload: LENGTH bytes]
 ```
 
 ### Client → Server messages
+
 ```json
-{"type": "login", "username": "Alice", "password": "secret"}
 {"type": "create_account", "username": "Alice", "password": "secret"}
+{"type": "login", "username": "Alice", "password": "secret"}
 {"type": "get_tables"}
-{"type": "create_table", "player_id": 1, "player_name": "Alice", "big_blind": 20}
-{"type": "join_table", "table_id": 3, "player_id": 1, "player_name": "Alice"}
+{"type": "create_table", "big_blind": 20}
+{"type": "join_table", "table_id": 3}
 {"type": "start_table"}
 {"type": "action", "action": "raise", "amount": 100}
 {"type": "action", "action": "fold"}
 ```
 
 ### Server → Client messages
+
 ```json
+{"type": "create_account_response", "success": true, "error": null}
 {"type": "login_response", "success": true, "player_id": 42, "player_name": "Alice", "error": null}
+{"type": "get_tables_response", "tables": [{"table_id": 1, "owner": "Alice", "num_players": 2, "big_blind": 20, "game_state": "WAITING"}]}
 {"type": "create_table_response", "success": true, "table_id": 3, "error": null}
 {"type": "join_table_response", "success": true, "table_id": 3, "error": null}
 {"type": "action_response", "success": true, "action": "raise", "amount": 100, "error": null}
 {"type": "action_response", "success": false, "action": "check", "error": "Cannot check, must call or raise"}
-{"type": "get_tables_response", "tables": [{"table_id": 1, "owner": "Alice", "num_players": 2, "big_blind": 20, "game_state": "WAITING"}]}
 {"type": "game_start"}
 {"type": "player_joined", "player": {"id": 2, "name": "Bob", "chips": 1500}}
 {"type": "player_left", "player_id": 2, "player_name": "Bob", "reason": "disconnected"}
-{"type": "hand_end", "winners": [...], "all_hands": [...]}
+{"type": "hand_end", "winners": [/* ... */], "all_hands": [/* ... */]}
 {"type": "error", "message": "Table 99 does not exist"}
 {"type": "game_state",
   "game_state": "FLOP",

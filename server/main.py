@@ -1,5 +1,7 @@
+import daemon
 from server.network.server import Server
 
 if __name__ == "__main__":
-    server = Server()
-    server.run()
+    with daemon.DaemonContext():
+        server = Server()
+        server.run()

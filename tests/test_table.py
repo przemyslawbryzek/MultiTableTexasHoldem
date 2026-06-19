@@ -41,6 +41,7 @@ def c(rank: int, suit: int) -> Card:
 def total_chips(*players: Player) -> int:
     return sum(p.chips.total_value() for p in players)
 
+
 class TestTableSetup(unittest.TestCase):
     def test_initial_state(self):
         alice = make_player(0, "Alice")
@@ -72,6 +73,7 @@ class TestTableSetup(unittest.TestCase):
         with self.assertRaises(ValueError):
             table.add_player(extra)
 
+
 class TestBlinds(unittest.TestCase):
 
     def test_blinds_deducted_from_players(self):
@@ -79,7 +81,7 @@ class TestBlinds(unittest.TestCase):
         bob = make_player(1, "Bob")
         table = make_table(alice, bob)
 
-        patch_deck(table, [c(2,0)] * 20)
+        patch_deck(table, [c(2, 0)] * 20)
         table.start_new_hand()
 
         chips_after = total_chips(alice, bob)
@@ -89,7 +91,7 @@ class TestBlinds(unittest.TestCase):
         alice = make_player(0, "Alice")
         bob = make_player(1, "Bob")
         table = make_table(alice, bob)
-        patch_deck(table, [c(2,0)] * 20)
+        patch_deck(table, [c(2, 0)] * 20)
         table.start_new_hand()
 
         self.assertEqual(table.pot.total_value(), 30)
@@ -98,7 +100,7 @@ class TestBlinds(unittest.TestCase):
         alice = make_player(0, "Alice")
         bob = make_player(1, "Bob")
         table = make_table(alice, bob)
-        patch_deck(table, [c(2,0)] * 20)
+        patch_deck(table, [c(2, 0)] * 20)
         table.start_new_hand()
 
         self.assertEqual(table.game_state, GameState.PRE_FLOP)
@@ -107,11 +109,12 @@ class TestBlinds(unittest.TestCase):
         alice = make_player(0, "Alice")
         bob = make_player(1, "Bob")
         table = make_table(alice, bob)
-        patch_deck(table, [c(2,0)] * 20)
+        patch_deck(table, [c(2, 0)] * 20)
         table.start_new_hand()
 
         self.assertEqual(len(alice.hand), 2)
         self.assertEqual(len(bob.hand), 2)
+
 
 class TestFoldWins(unittest.TestCase):
 
@@ -119,7 +122,7 @@ class TestFoldWins(unittest.TestCase):
         alice = make_player(0, "Alice")
         bob = make_player(1, "Bob")
         table = make_table(alice, bob)
-        patch_deck(table, [c(2,0)] * 20)
+        patch_deck(table, [c(2, 0)] * 20)
         table.start_new_hand()
 
         acting_player = table.players[table.current_player_idx]
@@ -133,7 +136,7 @@ class TestFoldWins(unittest.TestCase):
         alice = make_player(0, "Alice")
         bob = make_player(1, "Bob")
         table = make_table(alice, bob)
-        patch_deck(table, [c(2,0)] * 20)
+        patch_deck(table, [c(2, 0)] * 20)
 
         initial_total = total_chips(alice, bob)
         table.start_new_hand()
@@ -143,6 +146,7 @@ class TestFoldWins(unittest.TestCase):
 
         self.assertEqual(total_chips(alice, bob), initial_total)
 
+
 class TestFullHandShowdown(unittest.TestCase):
 
     def _run_full_hand_to_showdown(self, alice_cards, bob_cards, community):
@@ -150,10 +154,16 @@ class TestFullHandShowdown(unittest.TestCase):
         bob = make_player(1, "Bob")
         table = make_table(alice, bob)
 
-        deck_cards = [
-            alice_cards[0], bob_cards[0],
-            alice_cards[1], bob_cards[1],
-        ] + community + [c(2, 0)] * 10
+        deck_cards = (
+            [
+                alice_cards[0],
+                bob_cards[0],
+                alice_cards[1],
+                bob_cards[1],
+            ]
+            + community
+            + [c(2, 0)] * 10
+        )
 
         patch_deck(table, deck_cards)
         table.start_new_hand()
@@ -217,6 +227,7 @@ class TestFullHandShowdown(unittest.TestCase):
         )
         self.assertGreater(alice.chips.total_value(), bob.chips.total_value())
 
+
 class TestBettingMechanics(unittest.TestCase):
 
     def setUp(self):
@@ -266,6 +277,7 @@ class TestBettingMechanics(unittest.TestCase):
         self.table.process_player_action(pid, "call")
         self.assertEqual(self.table.pot.total_value(), 50)
 
+
 class TestThreePlayerHand(unittest.TestCase):
 
     def test_two_folds_winner_gets_pot(self):
@@ -296,10 +308,18 @@ class TestThreePlayerHand(unittest.TestCase):
         carol_cards = [c(5, 1), c(4, 3)]
         community = [c(10, 0), c(11, 0), c(12, 0), c(2, 2), c(3, 1)]
 
-        deck_cards = [
-            alice_cards[0], bob_cards[0], carol_cards[0],
-            alice_cards[1], bob_cards[1], carol_cards[1],
-        ] + community + [c(2, 0)] * 10
+        deck_cards = (
+            [
+                alice_cards[0],
+                bob_cards[0],
+                carol_cards[0],
+                alice_cards[1],
+                bob_cards[1],
+                carol_cards[1],
+            ]
+            + community
+            + [c(2, 0)] * 10
+        )
 
         patch_deck(table, deck_cards)
         initial_total = total_chips(alice, bob, carol)
@@ -309,7 +329,9 @@ class TestThreePlayerHand(unittest.TestCase):
             pid = table.players[table.current_player_idx].id
             table.process_player_action(pid, "call")
 
-        act(); act(); act()
+        act()
+        act()
+        act()
 
         for _ in range(9):
             pid = table.players[table.current_player_idx].id
@@ -318,11 +340,12 @@ class TestThreePlayerHand(unittest.TestCase):
         self.assertEqual(table.game_state, GameState.WAITING)
         self.assertEqual(total_chips(alice, bob, carol), initial_total)
 
+
 class TestSidePots(unittest.TestCase):
 
     def test_side_pot_calculation_two_all_ins(self):
         alice = make_player(0, "Alice", {100: 1})
-        bob = make_player(1, "Bob",   {100: 3})
+        bob = make_player(1, "Bob", {100: 3})
         carol = make_player(2, "Carol", {500: 1})
 
         table = make_table(alice, bob, carol)
@@ -363,7 +386,7 @@ class TestSidePots(unittest.TestCase):
     def test_all_in_player_cannot_win_more_than_eligible(self):
         alice = make_player(0, "Alice", {100: 1})
         bob = make_player(1, "Bob")
-        carol = make_player(2, "Carol") 
+        carol = make_player(2, "Carol")
         table = make_table(alice, bob, carol)
 
         alice.hand = [c(14, 0), c(13, 0)]
@@ -383,7 +406,9 @@ class TestSidePots(unittest.TestCase):
         table.distribute_pots()
 
         self.assertEqual(alice.chips.total_value(), 300)
-        self.assertEqual(bob.chips.total_value() + carol.chips.total_value(), 2700 + 2700 + 400)
+        self.assertEqual(
+            bob.chips.total_value() + carol.chips.total_value(), 2700 + 2700 + 400
+        )
 
     def test_chips_conserved_with_side_pots(self):
         alice = make_player(0, "Alice", {100: 1})
@@ -391,9 +416,9 @@ class TestSidePots(unittest.TestCase):
         carol = make_player(2, "Carol")
 
         initial_total = (
-            alice.chips.total_value() +
-            bob.chips.total_value() +
-            carol.chips.total_value()
+            alice.chips.total_value()
+            + bob.chips.total_value()
+            + carol.chips.total_value()
         )
 
         alice.hand = [c(14, 0), c(13, 0)]
@@ -415,9 +440,9 @@ class TestSidePots(unittest.TestCase):
         table.distribute_pots()
 
         final_total = (
-            alice.chips.total_value() +
-            bob.chips.total_value() +
-            carol.chips.total_value()
+            alice.chips.total_value()
+            + bob.chips.total_value()
+            + carol.chips.total_value()
         )
 
         self.assertEqual(initial_total, final_total)
@@ -436,6 +461,7 @@ class TestSidePots(unittest.TestCase):
         pots = table.calculate_side_pots()
         for pot in pots:
             self.assertNotIn(alice, pot.eligible_players)
+
 
 class TestMultipleHands(unittest.TestCase):
 
@@ -481,6 +507,7 @@ class TestMultipleHands(unittest.TestCase):
         with self.assertRaises(ValueError):
             table.start_new_hand()
 
+
 class TestEdgeCases(unittest.TestCase):
 
     def test_cannot_start_with_one_player(self):
@@ -507,10 +534,16 @@ class TestEdgeCases(unittest.TestCase):
         alice_cards = [c(14, 0), c(13, 0)]
         bob_cards = [c(9, 2), c(8, 2)]
         community = [c(10, 0), c(11, 0), c(12, 0), c(2, 2), c(3, 1)]
-        deck_cards = [
-            alice_cards[0], bob_cards[0],
-            alice_cards[1], bob_cards[1],
-        ] + community + [c(2, 0)] * 10
+        deck_cards = (
+            [
+                alice_cards[0],
+                bob_cards[0],
+                alice_cards[1],
+                bob_cards[1],
+            ]
+            + community
+            + [c(2, 0)] * 10
+        )
         patch_deck(table, deck_cards)
         table.start_new_hand()
 
@@ -518,7 +551,8 @@ class TestEdgeCases(unittest.TestCase):
             pid = table.players[table.current_player_idx].id
             table.process_player_action(pid, "call")
 
-        act(); act()  # Pre-flop
+        act()
+        act()  # Pre-flop
         for _ in range(6):
             pid = table.players[table.current_player_idx].id
             table.process_player_action(pid, "check")

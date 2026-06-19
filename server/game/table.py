@@ -58,7 +58,11 @@ class Table:
         raise ValueError("Player not found")
 
     def get_active_players(self) -> list[Player]:
-        return [p for p in self.players if p.is_active and not p.is_folded and not p.is_all_in]
+        return [
+            p
+            for p in self.players
+            if p.is_active and not p.is_folded and not p.is_all_in
+        ]
 
     def get_players_in_hand(self) -> list[Player]:
         return [p for p in self.players if p.is_active and not p.is_folded]
@@ -92,7 +96,7 @@ class Table:
         contributions = {p.id: p.total_bet_this_hand for p in self.players}
         all_in_players = sorted(
             [p for p in self.players if p.is_all_in],
-            key=lambda p: p.total_bet_this_hand
+            key=lambda p: p.total_bet_this_hand,
         )
 
         side_pots = []
@@ -107,10 +111,7 @@ class Table:
                 contribution = min(contributions[p.id], level) - previous_level
                 if contribution > 0:
                     pot_amount += contribution
-            eligible = [
-                p for p in players_in_hand
-                if p.total_bet_this_hand >= level
-            ]
+            eligible = [p for p in players_in_hand if p.total_bet_this_hand >= level]
 
             if pot_amount > 0:
                 side_pots.append(SidePot(amount=pot_amount, eligible_players=eligible))
@@ -119,21 +120,26 @@ class Table:
         if previous_level > 0:
             remaining_pot = 0
             for p in self.players:
-                contribution = contributions[p.id] - min(contributions[p.id], previous_level)
+                contribution = contributions[p.id] - min(
+                    contributions[p.id], previous_level
+                )
                 if contribution > 0:
                     remaining_pot += contribution
 
             eligible_for_main = [
-                p for p in players_in_hand
-                if p.total_bet_this_hand > previous_level
+                p for p in players_in_hand if p.total_bet_this_hand > previous_level
             ]
 
             if remaining_pot > 0 and eligible_for_main:
-                side_pots.append(SidePot(amount=remaining_pot, eligible_players=eligible_for_main))
+                side_pots.append(
+                    SidePot(amount=remaining_pot, eligible_players=eligible_for_main)
+                )
         else:
             total = sum(contributions.values())
             if total > 0:
-                side_pots.append(SidePot(amount=total, eligible_players=players_in_hand))
+                side_pots.append(
+                    SidePot(amount=total, eligible_players=players_in_hand)
+                )
 
         return side_pots
 
@@ -158,9 +164,7 @@ class Table:
         tie_winners = [winners[0]]
         for player in winners[1:]:
             result = HandEvaluator.hand_comparator(
-                player.hand,
-                tie_winners[0].hand,
-                self.community_cards
+                player.hand, tie_winners[0].hand, self.community_cards
             )
             if result > 0:
                 tie_winners = [player]
@@ -183,8 +187,8 @@ class Table:
                 winner.chips.add_amount(share)
             if remainder > 0:
                 all_players_ordered = (
-                    self.players[self.dealer_position + 1:] +
-                    self.players[:self.dealer_position + 1]
+                    self.players[self.dealer_position + 1 :]
+                    + self.players[: self.dealer_position + 1]
                 )
                 for p in all_players_ordered:
                     if p in winners:
@@ -348,7 +352,9 @@ class Table:
             else:
                 min_allowed = self.highest_bet + self.last_raise
             if amount < min_allowed:
-                raise ValueError("Raise amount must be greater than current highest bet and last raise")
+                raise ValueError(
+                    "Raise amount must be greater than current highest bet and last raise"
+                )
             if amount > player.chips.total_value() + player.bet_this_round:
                 raise ValueError("Not enough chips to raise")
             raise_amount = amount - player.bet_this_round
@@ -372,7 +378,7 @@ class Table:
 
         else:
             raise ValueError("Invalid action")
-        
+
         player.does_have_acted_this_round = True
         if len(self.get_players_in_hand()) == 1:
             self.distribute_pots()
@@ -382,7 +388,8 @@ class Table:
 
         active = self.get_active_players()
         all_players_have_acted = all(
-            (p.bet_this_round == self.highest_bet and p.does_have_acted_this_round) or p.is_folded
+            (p.bet_this_round == self.highest_bet and p.does_have_acted_this_round)
+            or p.is_folded
             for p in active
         )
 
@@ -434,7 +441,9 @@ class Table:
             self.game_state = GameState.WAITING
 
         else:
-            raise ValueError(f"Cannot advance game state from current state {self.game_state}")
+            raise ValueError(
+                f"Cannot advance game state from current state {self.game_state}"
+            )
 
     def clear_table(self):
         self.community_cards = []

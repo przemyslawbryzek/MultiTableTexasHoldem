@@ -2,8 +2,8 @@ STANDARD_CHIP_VALUES = (1000, 500, 100, 50, 25, 10, 5, 1)
 
 
 class Card:
-    rank: int      # 2-14 11: 'J', 12: 'Q', 13: 'K', 14: 'A'
-    suit: int      # 0-3
+    rank: int  # 2-14 11: 'J', 12: 'Q', 13: 'K', 14: 'A'
+    suit: int  # 0-3
 
     def __init__(self, rank: int, suit: int):
         if rank < 2 or rank > 14:
@@ -14,8 +14,8 @@ class Card:
         self.suit = suit
 
     def __str__(self) -> str:
-        rank_str = {11: 'J', 12: 'Q', 13: 'K', 14: 'A'}.get(self.rank, str(self.rank))
-        suit_str = ['♠', '♥', '♦', '♣'][self.suit]
+        rank_str = {11: "J", 12: "Q", 13: "K", 14: "A"}.get(self.rank, str(self.rank))
+        suit_str = ["♠", "♥", "♦", "♣"][self.suit]
         return f"{rank_str}{suit_str}"
     @staticmethod
     def str_to_card(card_str: str) -> 'Card':
@@ -40,7 +40,9 @@ class Chip:
 
     def __init__(self, value: int, amount: int):
         if value not in STANDARD_CHIP_VALUES:
-            raise ValueError("Chip value must be one of the standard values: 1, 5, 10, 25, 50, 100, 500, 1000")
+            raise ValueError(
+                "Chip value must be one of the standard values: 1, 5, 10, 25, 50, 100, 500, 1000"
+            )
         if amount < 0:
             raise ValueError("Chip amount cannot be negative")
         self.value = value
