@@ -10,58 +10,66 @@ class Client:
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.connect((host, port))
         self.sock.setblocking(False)
-        self.buf = b""
+        self._buf = b""
 
-    def poll(self):
+    def poll(self) -> list[dict]:
         try:
             while True:
-                self.buf += self.sock.recv(BUFFER_SIZE)
-        except OSError as e:
-            if e.errno not in [socket.EAGAIN, socket.EWOULDBLOCK]:
-                raise
-            if len(self.buf) == 0:
-                return None
-            msg, self.buf = Protocol.extract_message(self.buf)
-            return msg
+                chunk = self.sock.recv(BUFFER_SIZE)
+                if not chunk:
+                    raise ConnectionError("Server closed connection")
+                self._buf += chunk
+        except BlockingIOError:
+            pass
 
-    def _send(self, msg: dict):
-        self.sock.send(Protocol.encode_message(msg))
+        messages = []
+        while True:
+            msg, self._buf = Protocol.extract_message(self._buf)
+            if msg is None:
+                break
+            messages.append(msg)
+        return messages
 
-    def create_account(self, username: str, password: str):
-        self._send(
-            {
-                "type": MessageType.CREATE_ACCOUNT,
-                "username": username,
-                "password": password,
-            }
-        )
+    def _send(self, msg: dict) -> None:
+        self.sock.sendall(Protocol.encode_message(msg))
 
-    def login(self, username: str, password: str):
-        self._send(
-            {
-                "type": MessageType.LOGIN,
-                "username": username,
-                "password": password,
-            }
-        )
+    def create_account(self, username: str, password: str) -> None:
+        self._send({
+            "type": MessageType.CREATE_ACCOUNT,
+            "username": username,
+            "password": password,
+        })
 
-    def get_tables(self):
+    def login(self, username: str, password: str) -> None:
+        self._send({
+            "type": MessageType.LOGIN,
+            "username": username,
+            "password": password,
+        })
+
+    def get_tables(self) -> None:
         self._send({"type": MessageType.GET_TABLES})
 
-    def create_table(self, big_blind: int):
-        self._send({"type": MessageType.CREATE_TABLE, "big_blind": big_blind})
+    def create_table(self, big_blind: int, avatar: int = 1) -> None:
+        self._send({
+            "type": MessageType.CREATE_TABLE,
+            "big_blind": big_blind,
+            "avatar": avatar,
+        })
 
-    def join_table(self, table_id: int):
-        self._send({"type": MessageType.JOIN_TABLE, "table_id": table_id})
+    def join_table(self, table_id: int, avatar: int = 1) -> None:
+        self._send({
+            "type": MessageType.JOIN_TABLE,
+            "table_id": table_id,
+            "avatar": avatar,
+        })
 
-    def start_table(self):
+    def start_table(self) -> None:
         self._send({"type": MessageType.START_TABLE})
 
-    def action(self, action: str, amount: int | None):
-        self._send(
-            {
-                "type": MessageType.ACTION,
-                "action": action,
-                "amount": amount,
-            }
-        )
+    def action(self, action: str, amount: int = 0) -> None:
+        self._send({
+            "type": MessageType.ACTION,
+            "action": action,
+            "amount": amount,
+        })

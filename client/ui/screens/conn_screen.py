@@ -79,7 +79,7 @@ class ConnectionScreen:
 
     def _init_discovery_socket(self) -> None:
         try:
-            self.discovery_sock = join_membership(blocking=False)
+            self.discovery_sock = join_membership(blocking=False,port=False)
             self.discovery_sock.setblocking(False)
             probe_request_nb(self.discovery_sock)
         except Exception as exc:

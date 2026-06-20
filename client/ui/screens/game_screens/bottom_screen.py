@@ -34,7 +34,7 @@ BUTTON_GAP    = 10
 
 
 class GameBottomScreen:
-    def __init__(self):
+    def __init__(self, player_id: int | None = None):
         self.card_sheet = CardSheet()
         self.chip_sheet = ChipSheet()
 
@@ -44,7 +44,8 @@ class GameBottomScreen:
         else:
             self.bg = None
 
-        self.button_base = self._load_button_sprite()
+        self._button_base: pygame.Surface | None = self._load_button_sprite()
+        self._button_cache: dict[tuple[int, int], pygame.Surface] = {}
 
         if FONT_PATH.exists():
             self.font       = pygame.font.Font(str(FONT_PATH), 22)
@@ -56,36 +57,44 @@ class GameBottomScreen:
             self.tiny_font  = pygame.font.Font(None, 14)
 
         self.state:     GameState | None = None
-        self.player_id: int | None       = None
+        self.player_id: int | None       = player_id
         self.owner_id:  int | None       = None
-        self.bet_chips: dict[int, int] = {}
+        self.bet_chips: dict[int, int]   = {}
 
         self._right_chip_rects: list[tuple[pygame.Rect, int]] = []
         self._bet_chip_rects:   list[tuple[pygame.Rect, int]] = []
         self._button_rects:     dict[str, pygame.Rect]        = {}
+        self._enabled_actions:  set[str]                      = set()
 
     def _load_button_sprite(self) -> pygame.Surface | None:
         if BUTTON_PATH.exists():
-            img = pygame.image.load(str(BUTTON_PATH)).convert_alpha()
-            return img
+            try:
+                return pygame.image.load(str(BUTTON_PATH)).convert_alpha()
+            except pygame.error:
+                pass
         return None
 
+    def _get_scaled_button(self, w: int, h: int) -> pygame.Surface | None:
+        key = (w, h)
+        if key not in self._button_cache and self._button_base:
+            self._button_cache[key] = pygame.transform.smoothscale(self._button_base, key)
+        return self._button_cache.get(key)
+
     def _draw_button_bg(self, surface: pygame.Surface, rect: pygame.Rect, enabled: bool, color_override=None):
-        if self.button_base is not None:
-            scaled = pygame.transform.smoothscale(self.button_base, (rect.w, rect.h))
+        scaled = self._get_scaled_button(rect.w, rect.h)
+        if scaled is not None:
             if not enabled:
                 dark = scaled.copy()
                 dark.fill((90, 90, 90, 255), special_flags=pygame.BLEND_RGBA_MULT)
                 surface.blit(dark, rect.topleft)
+            elif color_override:
+                colored = scaled.copy()
+                colored.fill((*color_override, 255), special_flags=pygame.BLEND_RGBA_MULT)
+                surface.blit(colored, rect.topleft)
             else:
-                if color_override:
-                    colored = scaled.copy()
-                    colored.fill((*color_override, 255), special_flags=pygame.BLEND_RGBA_MULT)
-                    surface.blit(colored, rect.topleft)
-                else:
-                    surface.blit(scaled, rect.topleft)
+                surface.blit(scaled, rect.topleft)
         else:
-            color = color_override if color_override else ((70, 70, 90) if enabled else (40, 40, 45))
+            color = color_override if (color_override and enabled) else ((70, 70, 90) if enabled else (40, 40, 45))
             pygame.draw.rect(surface, color, rect, border_radius=4)
             pygame.draw.rect(surface, (0, 0, 0), rect, 1, border_radius=4)
 
@@ -255,11 +264,11 @@ class GameBottomScreen:
         surface.blit(shadow, (label_x + 1, label_y + 1))
         surface.blit(label,  (label_x, label_y))
 
-        full_rect = pygame.Rect(
-            min(draw_x, label_x), y,
-            max(cw, label.get_width()) + abs(label_x - draw_x),
-            max(ch, label.get_height()),
-        )
+        left   = min(draw_x, label_x)
+        right  = max(draw_x + cw, label_x + label.get_width())
+        top    = y
+        bottom = y + max(ch, label.get_height())
+        full_rect = pygame.Rect(left, top, right - left, bottom - top)
         return full_rect
 
     def _draw_buttons(self, surface: pygame.Surface):
@@ -332,7 +341,7 @@ class GameBottomScreen:
                 return None
 
         for action_key, rect in self._button_rects.items():
-            if rect.collidepoint(pos) and action_key in getattr(self, "_enabled_actions", set()):
+            if rect.collidepoint(pos) and action_key in self._enabled_actions:
                 amount = self._bet_total()
 
                 if action_key == "start":

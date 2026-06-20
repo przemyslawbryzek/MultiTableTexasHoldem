@@ -28,7 +28,7 @@ class TableManager:
         self.tables[table_id] = table
         self.table_to_fds[table_id] = [owner_fd]
         self.fd_to_player[owner_fd] = (table_id, owner_id)
-        logging.info(f"table {table_id} created by player {owner_name}")
+        logging.info(f"table {table_id} created by player {owner_name} (id={owner_id})")
         return table_id
 
     def delete_table(self, table_id: int):

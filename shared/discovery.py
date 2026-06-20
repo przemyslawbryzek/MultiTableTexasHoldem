@@ -11,7 +11,7 @@ _PING = b"ping"
 _PONG = b"pong"
 
 
-def join_membership(*, blocking: bool = True) -> socket.socket:
+def join_membership(*, blocking: bool = True,port: bool = True) -> socket.socket:
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
 
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -22,8 +22,10 @@ def join_membership(*, blocking: bool = True) -> socket.socket:
 
     mreq = struct.pack("4sL", socket.inet_aton(MULTICAST_GROUP), socket.INADDR_ANY)
     sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
-
-    sock.bind(("", UDP_PORT))
+    if port:
+        sock.bind(("", UDP_PORT))
+    else:
+        sock.bind(("", 0))
     sock.setblocking(blocking)
     return sock
 

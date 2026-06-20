@@ -41,6 +41,7 @@ class Table:
         self.highest_bet = 0
         self.last_raise = 0
         self.game_state = GameState.WAITING
+        self.hand_number = 0
 
     def add_player(self, player: Player):
         if len(self.players) >= self.max_players:
@@ -195,6 +196,16 @@ class Table:
                     if p in winners:
                         p.chips.add_amount(remainder)
                         break
+    def get_winner(self) -> list[Player]:
+        players_in_hand = self.get_players_in_hand()
+        if not players_in_hand:
+            return []
+        if len(players_in_hand) == 1:
+            return [players_in_hand[0]]
+
+        total_pot = self.pot.total_value() + sum(sp.amount for sp in self.side_pots)
+        fake_pot = SidePot(amount=total_pot, eligible_players=players_in_hand)
+        return self.get_pot_winners(fake_pot)
 
     def eliminate_players_with_no_chips(self):
         for player in self.players:
@@ -245,6 +256,7 @@ class Table:
         self.clear_table()
         self.post_blinds()
         self.deal_hole_cards()
+        self.hand_number += 1
         self.game_state = GameState.PRE_FLOP
 
     def get_available_actions(self, player_id: int) -> list[dict]:

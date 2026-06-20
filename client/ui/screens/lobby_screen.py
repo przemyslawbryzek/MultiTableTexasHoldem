@@ -226,7 +226,7 @@ class LobbyScreen:
             self._table_rows.append((rect, t.table_id))
 
         if not self.tables:
-            msg = self.tiny_font.render("No tables found — create one!", True, DIM)
+            msg = self.tiny_font.render("No tables found - create one!", True, DIM)
             surface.blit(msg, msg.get_rect(center=(CENTER_X, TABLES_Y + TABLES_H // 2)))
 
         if len(self.tables) > self._visible_rows:

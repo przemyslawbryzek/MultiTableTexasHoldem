@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field, asdict
 from typing import Optional, List
-from shared.enums import GameState as GamePhase, ActionType
+from shared.enums import GameState as GamePhase, ActionType,MessageType
 
 @dataclass
 class PlayerState:
@@ -65,9 +65,10 @@ class GameState:
 
     def to_dict(self) -> dict:
         return {
-            "type": "STATE",
+            "type": MessageType.STATE,
             "game_state": self.phase.value,
             "hand_number": self.hand_number,
+            "owner_id": self.owner_id,
             "dealer_position": self.dealer_position,
             "current_player_id": self.current_player_id,
             "small_blind": self.small_blind,
@@ -104,7 +105,7 @@ class GameState:
                     id=p["id"],
                     name=p["name"],
                     avatar=p["avatar"],
-                    chips=p["chips"],
+                    chips={int(k): v for k, v in p["chips"].items()},
                     bet_this_round=p["bet_this_round"],
                     total_bet_this_hand=p.get("total_bet_this_hand", 0),
                     is_active=p["is_active"],

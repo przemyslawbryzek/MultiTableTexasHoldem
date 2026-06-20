@@ -227,11 +227,11 @@ class Server:
 
     def _handle_create_table(self, conn: Conn, msg: dict):
         try:
-            big_blind = self._extract_field(conn, msg, "big_blind", int)
-            if big_blind is None:
+            big_blind     = msg.get("big_blind", 20)
+            if not isinstance(big_blind, int) or big_blind <= 0:
                 big_blind = 20
-            player_avatar = self._extract_field(conn, msg, "avatar", int)
-            if player_avatar is None:
+            player_avatar = msg.get("avatar", 1)
+            if not isinstance(player_avatar, int):
                 player_avatar = 1
             table_id = self.table_manager.create_table(
                 conn.fd,
@@ -252,6 +252,8 @@ class Server:
             )
             self._broadcast_table_state(table_id)
         except Exception as e:
+            import traceback
+            logging.error(f"_handle_create_table error: {traceback.format_exc()}")
             self._send(
                 conn.fd,
                 {
@@ -376,8 +378,12 @@ class Server:
         fds = self.table_manager.get_fds_at_table(table_id)
         for fd in fds:
             player_id = self.table_manager.get_player_id_by_fd(fd)
-            state = self._build_state_message(table, viewer_id=player_id)
-            self._send(fd, state)
+            try:
+                state = self._build_state_message(table, viewer_id=player_id)
+                self._send(fd, state)
+            except Exception:
+                import traceback
+                logging.error(f"_broadcast_table_state failed for fd={fd}:{traceback.format_exc()}")
 
     def _broadcast_hand_end(self, table_id: int):
         table = self.table_manager.get_table(table_id)
@@ -406,23 +412,20 @@ class Server:
             if fd != exclude_fd:
                 self._send(fd, msg)
 
-    def _send(self, conn: Conn, msg: dict):
+    def _send(self, fd: int, msg: dict) -> None:
+        conn = self.conns.get(fd)
+        if conn is None:
+            return
         try:
             data = Protocol.encode_message(msg)
             conn.sock.sendall(data)
         except Exception as e:
-            logging.error(f"send error fd={conn.fd}: {e}")
-            self._disconnect_client(conn.fd)
+            logging.error(f"send error fd={fd}: {e}")
+            self._disconnect_client(fd)
 
-    def _send_error(self, conn: Conn, message: str):
-        logging.warning(f"error to fd={conn.fd}: {message}")
-        self._send(
-            conn,
-            {
-                "type": MessageType.ERROR,
-                "message": message,
-            },
-        )
+    def _send_error(self, fd: int, message: str) -> None:
+        logging.warning(f"error to fd={fd}: {message}")
+        self._send(fd, {"type": MessageType.ERROR, "message": message})
 
     def _build_state_message(self, table, viewer_id: int) -> dict:
         players = []
@@ -465,7 +468,7 @@ class Server:
 
         game_state = GameStateData(
             phase=table.game_state,
-            owner_id=table.owner_id,
+            owner_id=table.owner.id,
             hand_number=table.hand_number,
             dealer_position=table.dealer_position,
             current_player_id=table.players[table.current_player_idx].id if table.game_state != GameState.WAITING else -1,

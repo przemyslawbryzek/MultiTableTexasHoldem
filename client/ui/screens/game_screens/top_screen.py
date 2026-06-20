@@ -71,14 +71,28 @@ class TopScreen:
         self.state = None
         self.player_id = None
         self._avatar_cache = AvatarSheetCache()
-        self._player_avatars = {}
+        self._player_avatars: dict = {}
+        self._status_msg: str = ""
+        self._status_timer_ms: float = 0.0
+
+    def set_status(self, msg: str) -> None:
+        self._status_msg = msg
+        self._status_timer_ms = 3000.0
+
+    def tick(self, dt_ms: float) -> None:
+        for av in self._player_avatars.values():
+            av.update(dt_ms)
+        if hasattr(self, "_status_timer_ms"):
+            self._status_timer_ms = max(0.0, self._status_timer_ms - dt_ms)
 
     def update(self, state: GameState, player_id: int, dt_ms: float = 16.0):
+        if state is None:
+            self.tick(dt_ms)
+            return
         self.state = state
         self.player_id = player_id
         self._sync_avatars(state.players)
-        for av in self._player_avatars.values():
-            av.update(dt_ms)
+        self.tick(dt_ms)
 
     def _sync_avatars(self, players: list[PlayerState]):
         seen = set()
@@ -109,6 +123,7 @@ class TopScreen:
 
         self._draw_hole_cards(surface, self.state.community_cards, self.state.phase)
         self._draw_players(surface, self.state.players)
+        self._draw_status_overlay(surface)
 
     def _draw_info_panel(self, surface: pygame.Surface):
         my_player = None
@@ -241,7 +256,7 @@ class TopScreen:
             return
         total_h = sum(line.get_height() for line in lines) + 2 * (len(lines) - 1)
         start_y = avatar_rect.centery - total_h // 2
-        offset = 0
+        offset = 4
         for line in lines:
             if align == 'left':
                 rect = line.get_rect(midright=(avatar_rect.left - offset, start_y))
@@ -250,3 +265,15 @@ class TopScreen:
 
             surface.blit(line, rect)
             start_y += line.get_height() + 2
+
+    def _draw_status_overlay(self, surface: pygame.Surface) -> None:
+        if not self._status_msg or self._status_timer_ms <= 0:
+            return
+        alpha = min(255, int(255 * self._status_timer_ms / 500))
+        surf = self.small_font.render(self._status_msg, True, GOLD)
+        rect = surf.get_rect(center=(400, TABLE_CENTER_Y - 60))
+        bg = pygame.Surface((rect.w + 16, rect.h + 8), pygame.SRCALPHA)
+        bg.fill((0, 0, 0, min(160, alpha)))
+        surface.blit(bg, (rect.x - 8, rect.y - 4))
+        surf.set_alpha(alpha)
+        surface.blit(surf, rect)
