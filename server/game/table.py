@@ -29,6 +29,7 @@ class Table:
     def __init__(self, owner: Player, starting_chips: dict[int, int], big_blind: int):
         self.owner = owner
         self.players = [owner]
+        self.max_players = 9
         self.community_cards = []
         self.pot = Chips({value: 0 for value in starting_chips.keys()})
         self.side_pots = []
@@ -42,7 +43,7 @@ class Table:
         self.game_state = GameState.WAITING
 
     def add_player(self, player: Player):
-        if len(self.players) >= 9:
+        if len(self.players) >= self.max_players:
             raise ValueError("Table is full")
         if self.game_state != GameState.WAITING:
             raise ValueError("Cannot join a game in progress")

@@ -102,6 +102,7 @@ class TableManager:
                 "table_id": table_id,
                 "owner": table.owner.name,
                 "num_players": len(table.players),
+                "max_players": table.max_players,
                 "big_blind": table.big_blind,
                 "game_state": table.game_state.name,
             }
