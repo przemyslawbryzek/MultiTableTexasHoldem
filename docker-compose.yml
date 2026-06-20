@@ -3,3 +3,10 @@ services:
     build: .
     ports:
       - "7777:7777"
+      - "9876:9876/udp"
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
