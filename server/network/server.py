@@ -7,7 +7,8 @@ from server.utils import db, kdf
 from server.network.table_manager import TableManager
 from shared import discovery
 from shared.protocol import Protocol
-from shared.enums import GameState, MessageType
+from shared.enums import GameState, MessageType, ActionType
+from shared.game_state import GameState as GameStateData, PlayerState, SidePotState, AvailableAction
 
 BUFFER_SIZE = 4096
 
@@ -229,10 +230,14 @@ class Server:
             big_blind = self._extract_field(conn, msg, "big_blind", int)
             if big_blind is None:
                 big_blind = 20
+            player_avatar = self._extract_field(conn, msg, "avatar", int)
+            if player_avatar is None:
+                player_avatar = 1
             table_id = self.table_manager.create_table(
                 conn.fd,
                 conn.user.id,
                 conn.user.username,
+                player_avatar,
                 big_blind,
             )
             logging.info(f"table {table_id} created by fd={conn.fd}")
@@ -264,8 +269,11 @@ class Server:
         try:
             player_id = conn.user.id
             player_name = conn.user.username
+            player_avatar = self._extract_field(conn, msg, "avatar", int)
+            if player_avatar is None:
+                player_avatar = 1
             self.table_manager.add_player_to_table(
-                table_id, player_id, player_name, conn.fd
+                table_id, player_id, player_name, player_avatar, conn.fd
             )
             self._send(
                 conn.fd,
@@ -282,6 +290,7 @@ class Server:
                 "player": {
                     "id": player_id,
                     "name": player_name,
+                    "avatar": player_avatar,
                     "chips": table.players[-1].chips.total_value(),
                 },
             }
@@ -416,29 +425,58 @@ class Server:
         )
 
     def _build_state_message(self, table, viewer_id: int) -> dict:
-        players_info = []
+        players = []
         for p in table.players:
-            players_info.append(
-                {
-                    "id": p.id,
-                    "name": p.name,
-                    "chips": p.chips.total_value(),
-                    "bet": p.bet_this_round,
-                    "is_folded": p.is_folded,
-                    "is_all_in": p.is_all_in,
-                    "is_active": p.is_active,
-                    "hand": [str(c) for c in p.hand] if p.id == viewer_id else [],
-                    "hand_size": len(p.hand),
-                }
+            players.append(
+                PlayerState(
+                    id=p.id,
+                    name=p.name,
+                    avatar=p.avatar,
+                    chips=p.chips.to_dict(),
+                    bet_this_round=p.bet_this_round,
+                    total_bet_this_hand=p.total_bet_this_hand,
+                    is_active=p.is_active,
+                    is_folded=p.is_folded,
+                    is_all_in=p.is_all_in,
+                    position=table.players.index(p),
+                    hand=[str(c) for c in p.hand] if p.id == viewer_id else [],
+                    hand_size=len(p.hand),
+                )
             )
-        return {
-            "type": MessageType.STATE,
-            "game_state": table.game_state.name,
-            "players": players_info,
-            "community_cards": [str(c) for c in table.community_cards],
-            "pot": table.pot.total_value(),
-            "current_player": table.players[table.current_player_idx].id,
-            "highest_bet": table.highest_bet,
-            "small_blind": table.small_blind,
-            "big_blind": table.big_blind,
-        }
+
+        side_pots = [
+            SidePotState(
+                amount=sp.amount,
+                eligible_players=[pl.id for pl in sp.eligible_players],
+            )
+            for sp in table.side_pots
+        ]
+
+        available_actions = []
+        for act in table.get_available_actions(viewer_id):
+            available_actions.append(
+                AvailableAction(
+                    action=ActionType(act["action"]),
+                    min_amount=act["min_amount"],
+                    max_amount=act["max_amount"],
+                    label=act["label"],
+                )
+            )
+
+        game_state = GameStateData(
+            phase=table.game_state,
+            owner_id=table.owner_id,
+            hand_number=table.hand_number,
+            dealer_position=table.dealer_position,
+            current_player_id=table.players[table.current_player_idx].id if table.game_state != GameState.WAITING else -1,
+            small_blind=table.small_blind,
+            big_blind=table.big_blind,
+            highest_bet=table.highest_bet,
+            last_raise=table.last_raise,
+            pot=table.pot.total_value(),
+            side_pots=side_pots,
+            community_cards=[str(c) for c in table.community_cards],
+            players=players,
+            available_actions=available_actions,
+        )
+        return game_state.to_dict()
