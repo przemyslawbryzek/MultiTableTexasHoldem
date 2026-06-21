@@ -175,8 +175,11 @@ class App:
 
             case MessageType.HAND_END:
                 winners = msg.get("winners", [])
-                names = ", ".join(w["name"] for w in winners)
-                self._set_status(f"Hand over - winner(s): {names}")
+                if self.state == AppState.GAME and hasattr(self.ui, "show_showdown"):
+                    self.ui.show_showdown(winners)
+                else:
+                    names = ", ".join(w.get("name", "?") for w in winners)
+                    self._set_status(f"Hand over - winner(s): {names}")
 
             case MessageType.PLAYER_JOINED:
                 name = msg.get("player", {}).get("name", "?")
