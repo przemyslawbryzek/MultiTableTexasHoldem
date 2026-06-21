@@ -13,27 +13,30 @@ from client.ui.screens.game_screens.bottom_screen import GameBottomScreen
 SCREEN_W, SCREEN_H = 800, 700
 FPS = 60
 
+
 class AppState:
     CONNECTING = "connecting"
-    LOGIN      = "login"
-    LOBBY      = "lobby"
-    GAME       = "game"
+    LOGIN = "login"
+    LOBBY = "lobby"
+    GAME = "game"
+
 
 class App:
     def __init__(self):
         pygame.init()
         self.screen = pygame.display.set_mode((SCREEN_W, SCREEN_H))
         pygame.display.set_caption("Poker")
-        self.clock  = pygame.time.Clock()
+        self.clock = pygame.time.Clock()
 
-        self.client:        Client | None             = None
-        self.player_id:     int | None                = None
-        self.player_name:   str | None                = None
-        self.avatar_index:  int                       = 1
+        self.client: Client | None = None
+        self.player_id: int | None = None
+        self.player_name: str | None = None
+        self.avatar_index: int = 1
 
-        self.state  = AppState.CONNECTING
-        self.ui:    ConnectionScreen | LoginScreen | LobbyScreen | GameScreenManager \
-                    = ConnectionScreen()
+        self.state = AppState.CONNECTING
+        self.ui: ConnectionScreen | LoginScreen | LobbyScreen | GameScreenManager = (
+            ConnectionScreen()
+        )
 
         self.running = True
 
@@ -112,7 +115,10 @@ class App:
 
         for msg in messages:
             import logging
-            logging.debug(f"[poll] state={self.state} msg_type={msg.get('type')} keys={list(msg.keys())}")
+
+            logging.debug(
+                f"[poll] state={self.state} msg_type={msg.get('type')} keys={list(msg.keys())}"
+            )
             self._handle_server_message(msg)
 
     def _set_status(self, msg: str) -> None:
@@ -134,7 +140,7 @@ class App:
 
             case MessageType.LOGIN_RESPONSE:
                 if msg.get("success"):
-                    self.player_id   = msg["player_id"]
+                    self.player_id = msg["player_id"]
                     self.player_name = msg["player_name"]
                     self._go_lobby()
                 else:
@@ -142,10 +148,13 @@ class App:
 
             case MessageType.GET_TABLES_RESPONSE:
                 if self.state == AppState.LOBBY:
-                    tables = [TableInfo.from_server_dict(d) for d in msg.get("tables", [])]
+                    tables = [
+                        TableInfo.from_server_dict(d) for d in msg.get("tables", [])
+                    ]
                     self.ui.set_tables(tables)
                     self._set_status(
-                        f"{len(tables)} table(s) available" if tables
+                        f"{len(tables)} table(s) available"
+                        if tables
                         else "No tables - create one!"
                     )
 
@@ -168,7 +177,10 @@ class App:
                         self.ui.update(game_state, self.player_id, dt_ms=0)
                     except Exception:
                         import logging, traceback
-                        logging.warning(f"Failed to deserialize game state:\n{traceback.format_exc()}")
+
+                        logging.warning(
+                            f"Failed to deserialize game state:\n{traceback.format_exc()}"
+                        )
 
             case MessageType.GAME_START:
                 self._set_status("Game started!")
@@ -192,16 +204,16 @@ class App:
             case MessageType.ERROR:
                 self._set_status(f"Server error: {msg.get('message', 'Unknown error')}")
 
-    def _do_connect(self, host: str) -> None:
-        if ":" in host:
-            ip, port_str = host.rsplit(":", 1)
+    def _do_connect(self, addr: str) -> None:
+        if ":" in addr:
+            ip, port_str = addr.rsplit(":", 1)
             try:
                 port = int(port_str)
             except ValueError:
                 self.ui.set_status("Invalid port number")
                 return
         else:
-            ip, port = host, 7777
+            ip, port = addr, 7777
 
         try:
             self.client = Client(ip, port)
@@ -212,23 +224,23 @@ class App:
 
     def _go_login(self) -> None:
         self.state = AppState.LOGIN
-        self.ui    = LoginScreen()
+        self.ui = LoginScreen()
 
     def _go_lobby(self) -> None:
         self.state = AppState.LOBBY
-        self.ui    = LobbyScreen()
+        self.ui = LobbyScreen()
         self.client.get_tables()
 
     def _go_game(self) -> None:
         self.state = AppState.GAME
-        top    = TopScreen()
+        top = TopScreen()
         bottom = GameBottomScreen(self.player_id)
         self.ui = GameScreenManager(top, bottom)
 
     def _handle_disconnect(self) -> None:
         self.client = None
-        self.state  = AppState.CONNECTING
-        self.ui     = ConnectionScreen()
+        self.state = AppState.CONNECTING
+        self.ui = ConnectionScreen()
         self.ui.set_status("Disconnected from server")
 
     def _update(self, dt: float) -> None:
@@ -242,9 +254,13 @@ class App:
         self.ui.draw(self.screen)
         pygame.display.flip()
 
+
 def main() -> None:
     import logging
-    logging.basicConfig(level=logging.DEBUG, format="[%(asctime)s] %(levelname)s: %(message)s")
+
+    logging.basicConfig(
+        level=logging.DEBUG, format="[%(asctime)s] %(levelname)s: %(message)s"
+    )
     app = App()
 
     match len(sys.argv):

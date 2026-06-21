@@ -8,9 +8,15 @@ from server.network.table_manager import TableManager
 from shared import discovery
 from shared.protocol import Protocol
 from shared.enums import GameState, MessageType, ActionType
-from shared.game_state import GameState as GameStateData, PlayerState, SidePotState, AvailableAction
+from shared.game_state import (
+    GameState as GameStateData,
+    PlayerState,
+    SidePotState,
+    AvailableAction,
+)
 
 BUFFER_SIZE = 4096
+DEFAULT_PORT = 7777
 
 
 @dataclass
@@ -28,7 +34,8 @@ class Conn:
 
 
 class Server:
-    def __init__(self, host: str = "0.0.0.0", port: int = 7777):
+
+    def __init__(self, *, host: str = "0.0.0.0", port: int = DEFAULT_PORT):
         db.init()
         self.host = host
         self.port = port
@@ -39,7 +46,7 @@ class Server:
         self.server_socket.setblocking(False)
         self.server_socket.bind((self.host, self.port))
         self.server_socket.listen()
-        self.discovery_socket = discovery.join_membership(blocking=False)
+        self.discovery_socket = discovery.join_membership(listening_port=port)
         self.epoll = select.epoll()
         self.epoll.register(self.server_socket.fileno(), select.EPOLLIN)
         self.epoll.register(self.discovery_socket.fileno(), select.EPOLLIN)
@@ -59,7 +66,7 @@ class Server:
                     if fd == self.server_socket.fileno():
                         self._accept_connection()
                     elif fd == self.discovery_socket.fileno():
-                        discovery.probe_response(self.discovery_socket)
+                        discovery.probe_response(self.discovery_socket, self.port)
                     elif event & (select.EPOLLHUP | select.EPOLLERR):
                         self._disconnect_client(fd)
                     elif event & select.EPOLLIN:
@@ -227,7 +234,7 @@ class Server:
 
     def _handle_create_table(self, conn: Conn, msg: dict):
         try:
-            big_blind     = msg.get("big_blind", 20)
+            big_blind = msg.get("big_blind", 20)
             if not isinstance(big_blind, int) or big_blind <= 0:
                 big_blind = 20
             player_avatar = msg.get("avatar", 1)
@@ -253,6 +260,7 @@ class Server:
             self._broadcast_table_state(table_id)
         except Exception as e:
             import traceback
+
             logging.error(f"_handle_create_table error: {traceback.format_exc()}")
             self._send(
                 conn.fd,
@@ -383,7 +391,10 @@ class Server:
                 self._send(fd, state)
             except Exception:
                 import traceback
-                logging.error(f"_broadcast_table_state failed for fd={fd}:{traceback.format_exc()}")
+
+                logging.error(
+                    f"_broadcast_table_state failed for fd={fd}:{traceback.format_exc()}"
+                )
 
     def _broadcast_hand_end(self, table_id: int):
         table = self.table_manager.get_table(table_id)
@@ -471,7 +482,11 @@ class Server:
             owner_id=table.owner.id,
             hand_number=table.hand_number,
             dealer_position=table.dealer_position,
-            current_player_id=table.players[table.current_player_idx].id if table.game_state != GameState.WAITING else -1,
+            current_player_id=(
+                table.players[table.current_player_idx].id
+                if table.game_state != GameState.WAITING
+                else -1
+            ),
             small_blind=table.small_blind,
             big_blind=table.big_blind,
             highest_bet=table.highest_bet,

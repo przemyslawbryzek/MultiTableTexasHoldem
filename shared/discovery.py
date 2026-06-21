@@ -1,9 +1,12 @@
+import random
 import socket
 import struct
-import time
+from server.network import server
 
 MULTICAST_GROUP = "224.3.3.3"
 UDP_PORT = 9876
+UDP_EXTRA_PORTS = [9877, 9878, 9879]
+UDP_ALL_PORTS = [UDP_PORT] + UDP_EXTRA_PORTS
 MULTICAST_TTL = 2
 RECV_BUF = 16
 
@@ -11,7 +14,7 @@ _PING = b"ping"
 _PONG = b"pong"
 
 
-def join_membership(*, blocking: bool = True,port: bool = True) -> socket.socket:
+def join_membership(*, listening_port: int | None = None) -> socket.socket:
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
 
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -22,35 +25,35 @@ def join_membership(*, blocking: bool = True,port: bool = True) -> socket.socket
 
     mreq = struct.pack("4sL", socket.inet_aton(MULTICAST_GROUP), socket.INADDR_ANY)
     sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
-    if port:
-        sock.bind(("", UDP_PORT))
-    else:
+    sock.setblocking(False)
+    if listening_port is None:
         sock.bind(("", 0))
-    sock.setblocking(blocking)
+    elif listening_port is not server.DEFAULT_PORT:
+        sock.bind(("", random.choice(UDP_EXTRA_PORTS)))
+    else:
+        sock.bind(("", UDP_PORT))
     return sock
 
 
-def probe_request(sock: socket.socket) -> str | None:
-    sock.sendto(_PING, (MULTICAST_GROUP, UDP_PORT))
-    deadline = time.monotonic() + 5.0
-    sock.settimeout(5.0)
+def probe_request(sock: socket.socket) -> None:
+    for port in UDP_ALL_PORTS:
+        sock.sendto(_PING, (MULTICAST_GROUP, port))
+
+
+def probe_poll(sock: socket.socket):
+    addrs = []
     try:
-        while time.monotonic() < deadline:
-            remaining = deadline - time.monotonic()
-            sock.settimeout(max(remaining, 0))
-            data, (addr, _port) = sock.recvfrom(RECV_BUF)
-            if data == _PONG:
-                return addr
-    except (socket.timeout, OSError):
+        while True:
+            data, (host, _) = sock.recvfrom(RECV_BUF)
+            if data[: len(_PONG)] == _PONG:
+                port = struct.unpack(">H", data[len(_PONG) :])[0]
+                addrs.append((host, port))
+    except OSError:
         pass
-    return None
+    return addrs
 
 
-def probe_request_nb(sock: socket.socket) -> None:
-    sock.sendto(_PING, (MULTICAST_GROUP, UDP_PORT))
-
-
-def probe_response(sock: socket.socket) -> None:
+def probe_response(sock: socket.socket, listening_port: int) -> None:
     data, addr = sock.recvfrom(RECV_BUF)
     if data == _PING:
-        sock.sendto(_PONG, addr)
+        sock.sendto(_PONG + struct.pack(">H", listening_port), addr)
