@@ -2,6 +2,7 @@ import socket
 import select
 import sys
 import logging
+from logging.handlers import SysLogHandler
 from dataclasses import dataclass
 from server.utils import kdf
 from server.utils.db import DB
@@ -36,11 +37,12 @@ class Conn:
 
 class Server:
 
-    def __init__(self, *, host: str = "0.0.0.0", port: int = DEFAULT_PORT):
+    def __init__(
+        self, logger: logging.Logger, *, host: str = "0.0.0.0", port: int = DEFAULT_PORT
+    ):
         self.db = DB()
         self.host = host
         self.port = port
-        self.table_manager = TableManager()
         self.conns: dict[int, Conn] = {}
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -51,15 +53,12 @@ class Server:
         self.epoll = select.epoll()
         self.epoll.register(self.server_socket.fileno(), select.EPOLLIN)
         self.epoll.register(self.discovery_socket.fileno(), select.EPOLLIN)
-        logging.basicConfig(
-            level=logging.INFO,
-            format="[%(asctime)s] %(levelname)s: %(message)s",
-            stream=sys.stdout,
-        )
-        logging.info(f"server started on {self.host}:{self.port}")
+        self.logger = logger
+        self.table_manager = TableManager(logger)
+        logger.info(f"server started on {self.host}:{self.port}")
 
     def run(self):
-        logging.info("server running, waiting for connections...")
+        self.logger.info("server running, waiting for connections...")
         try:
             while True:
                 events = self.epoll.poll()
@@ -82,9 +81,9 @@ class Server:
             fd = client_socket.fileno()
             self.conns[fd] = Conn(fd, client_socket, b"", None)
             self.epoll.register(fd, select.EPOLLIN)
-            logging.info(f"new connection from {addr} (fd={fd})")
+            self.logger.info(f"new connection from {addr} (fd={fd})")
         except Exception as e:
-            logging.error(f"accept error: {e}")
+            self.logger.error(f"accept error: {e}")
 
     def _disconnect_client(self, fd: int):
         try:
@@ -95,7 +94,7 @@ class Server:
         if not conn:
             return
         conn.sock.close()
-        logging.info(f"client disconnected (fd={fd})")
+        self.logger.info(f"client disconnected (fd={fd})")
         if conn.user:
             self.table_manager.remove_player_by_fd(conn.fd)
 
@@ -111,7 +110,7 @@ class Server:
         except Exception:
             pass
         self.server_socket.close()
-        logging.info("server shutdown")
+        self.logger.info("server shutdown")
 
     def _handle_client_data(self, fd: int):
         conn = self.conns.get(fd)
@@ -131,7 +130,7 @@ class Server:
         except ConnectionResetError:
             self._disconnect_client(fd)
         except Exception as e:
-            logging.error(f"error reading fd={fd}: {e}")
+            self.logger.error(f"error reading fd={fd}: {e}")
             self._disconnect_client(fd)
 
     def _extract_field(self, conn: Conn, msg: dict, name: str, t: type):
@@ -158,7 +157,7 @@ class Server:
         if handler is None:
             self._send_error(conn.fd, f"Unknown message type: {msg_type}")
             return
-        logging.debug(f"fd={conn.fd} type={msg_type}")
+        self.logger.debug(f"fd={conn.fd} type={msg_type}")
         require_auth = msg_type not in [
             MessageType.CREATE_ACCOUNT,
             MessageType.LOGIN,
@@ -248,7 +247,7 @@ class Server:
                 player_avatar,
                 big_blind,
             )
-            logging.info(f"table {table_id} created by fd={conn.fd}")
+            self.logger.info(f"table {table_id} created by fd={conn.fd}")
             self._send(
                 conn.fd,
                 {
@@ -262,7 +261,7 @@ class Server:
         except Exception as e:
             import traceback
 
-            logging.error(f"_handle_create_table error: {traceback.format_exc()}")
+            self.logger.error(f"_handle_create_table error: {traceback.format_exc()}")
             self._send(
                 conn.fd,
                 {
@@ -307,7 +306,7 @@ class Server:
             }
             self._broadcast(table_id, joined_msg, exclude_fd=conn.fd)
             self._broadcast_table_state(table_id)
-            logging.info(f"player {player_id} joined table {table_id}")
+            self.logger.info(f"player {player_id} joined table {table_id}")
         except Exception as e:
             self._send(
                 conn.fd,
@@ -327,7 +326,7 @@ class Server:
                 return
             table = self.table_manager.get_table(table_id)
             table.start_new_hand()
-            logging.info(f"hand started at table {table_id}")
+            self.logger.info(f"hand started at table {table_id}")
             self._broadcast(table_id, {"type": MessageType.GAME_START})
             self._broadcast_table_state(table_id)
         except Exception as e:
@@ -358,7 +357,7 @@ class Server:
                     "error": None,
                 },
             )
-            logging.info(
+            self.logger.info(
                 f"player {player_id} action={action} amount={amount} table={table_id}"
             )
             if table.game_state == GameState.WAITING:
@@ -377,7 +376,7 @@ class Server:
                 },
             )
         except Exception as e:
-            logging.error(f"action error: {e}")
+            self.logger.error(f"action error: {e}")
             self._send_error(conn.fd, "Internal server error")
 
     def _broadcast_table_state(self, table_id: int):
@@ -393,7 +392,7 @@ class Server:
             except Exception:
                 import traceback
 
-                logging.error(
+                self.logger.error(
                     f"_broadcast_table_state failed for fd={fd}:{traceback.format_exc()}"
                 )
 
@@ -432,11 +431,11 @@ class Server:
             data = Protocol.encode_message(msg)
             conn.sock.sendall(data)
         except Exception as e:
-            logging.error(f"send error fd={fd}: {e}")
+            self.logger.error(f"send error fd={fd}: {e}")
             self._disconnect_client(fd)
 
     def _send_error(self, fd: int, message: str) -> None:
-        logging.warning(f"error to fd={fd}: {message}")
+        self.logger.warning(f"error to fd={fd}: {message}")
         self._send(fd, {"type": MessageType.ERROR, "message": message})
 
     def _build_state_message(self, table, viewer_id: int) -> dict:

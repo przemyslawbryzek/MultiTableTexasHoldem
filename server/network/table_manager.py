@@ -7,7 +7,8 @@ STARTING_CHIPS = {1000: 0, 500: 0, 100: 5, 50: 10, 25: 0, 10: 50, 5: 0, 1: 0}
 
 
 class TableManager:
-    def __init__(self):
+    def __init__(self, logger: logging.Logger):
+        self.logger = logger
         self.tables: dict[int, Table] = {}
         self.fd_to_player: dict[int, tuple[int, int]] = {}
         self.table_to_fds: dict[int, list[int]] = {}
@@ -28,7 +29,9 @@ class TableManager:
         self.tables[table_id] = table
         self.table_to_fds[table_id] = [owner_fd]
         self.fd_to_player[owner_fd] = (table_id, owner_id)
-        logging.info(f"table {table_id} created by player {owner_name} (id={owner_id})")
+        self.logger.info(
+            f"table {table_id} created by player {owner_name} (id={owner_id})"
+        )
         return table_id
 
     def delete_table(self, table_id: int):
@@ -38,7 +41,7 @@ class TableManager:
         for fd in fds:
             self.fd_to_player.pop(fd, None)
         del self.tables[table_id]
-        logging.info(f"table {table_id} deleted")
+        self.logger.info(f"table {table_id} deleted")
 
     def get_table(self, table_id: int) -> Table | None:
         return self.tables.get(table_id)
@@ -58,7 +61,7 @@ class TableManager:
         table.add_player(player)
         self.fd_to_player[client_fd] = (table_id, player_id)
         self.table_to_fds.setdefault(table_id, []).append(client_fd)
-        logging.info(f"player {player_name} added to table {table_id}")
+        self.logger.info(f"player {player_name} added to table {table_id}")
 
     def remove_player_by_fd(self, fd: int):
         if fd not in self.fd_to_player:
@@ -71,7 +74,9 @@ class TableManager:
                 if current.id == player_id:
                     try:
                         table.process_player_action(player_id, "fold")
-                        logging.info(f"auto-fold for disconnected player {player_id}")
+                        self.logger.info(
+                            f"auto-fold for disconnected player {player_id}"
+                        )
                     except Exception:
                         pass
             table.remove_player(player_id)
@@ -80,7 +85,7 @@ class TableManager:
                 fds.remove(fd)
             if not table.players:
                 self.delete_table(table_id)
-                logging.info(f"table {table_id} deleted")
+                self.logger.info(f"table {table_id} deleted")
 
     def get_table_id_by_fd(self, fd: int) -> int | None:
         mapping = self.fd_to_player.get(fd)

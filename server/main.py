@@ -1,16 +1,27 @@
 import argparse
 import sys
-import pathlib
 import os
+import logging
+from logging.handlers import SysLogHandler
 from server.network.server import Server
 
 
-def main(port: int):
-    if port is not None:
-        server = Server(port=port)
-    else:
-        server = Server()
-    server.run()
+def main(port: int | None):
+    logger = logging.getLogger("SysLogLogger")
+    logger.setLevel(logging.INFO)
+    logger_handler = SysLogHandler(address="/dev/log")
+    pid = os.getpid()
+    logger_handler.ident = f"texas-holdem[{pid}]: "
+    logger.addHandler(logger_handler)
+    try:
+        if port is not None:
+            server = Server(logger, port=port)
+        else:
+            server = Server(logger)
+        server.run()
+    except Exception:
+        logger.exception("unhandled exception")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
@@ -32,9 +43,7 @@ if __name__ == "__main__":
                 file=sys.stderr,
             )
             sys.exit(1)
-        dir = pathlib.Path(__file__).parent.resolve()
-        log = open(os.path.join(dir, "server.log"), "w+")
-        with daemon.DaemonContext(stdout=log, stderr=log):
+        with daemon.DaemonContext():
             main(args.port)
     else:
         main(args.port)
