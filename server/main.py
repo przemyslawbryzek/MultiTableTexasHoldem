@@ -1,5 +1,7 @@
 import argparse
 import sys
+import pathlib
+import os
 from server.network.server import Server
 
 
@@ -30,7 +32,9 @@ if __name__ == "__main__":
                 file=sys.stderr,
             )
             sys.exit(1)
-        with daemon.DaemonContext():
+        dir = pathlib.Path(__file__).parent.resolve()
+        log = open(os.path.join(dir, "server.log"), "w+")
+        with daemon.DaemonContext(stdout=log, stderr=log):
             main(args.port)
     else:
         main(args.port)

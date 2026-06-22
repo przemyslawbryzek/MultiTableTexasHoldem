@@ -3,7 +3,8 @@ import select
 import sys
 import logging
 from dataclasses import dataclass
-from server.utils import db, kdf
+from server.utils import kdf
+from server.utils.db import DB
 from server.network.table_manager import TableManager
 from shared import discovery
 from shared.protocol import Protocol
@@ -36,7 +37,7 @@ class Conn:
 class Server:
 
     def __init__(self, *, host: str = "0.0.0.0", port: int = DEFAULT_PORT):
-        db.init()
+        self.db = DB()
         self.host = host
         self.port = port
         self.table_manager = TableManager()
@@ -175,7 +176,7 @@ class Server:
         if not password:
             return
         hash = kdf.hash(password)
-        db.create_user(username, hash)
+        self.db.create_user(username, hash)
         self._send(
             conn.fd,
             {
@@ -192,7 +193,7 @@ class Server:
         password = self._extract_field(conn, msg, "password", str)
         if not password:
             return
-        user = db.get_user(username)
+        user = self.db.get_user(username)
         ok = False
         if user is None:
             kdf.hash("mock")
