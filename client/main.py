@@ -1,4 +1,5 @@
 import sys
+import socket
 import pygame
 from shared.enums import MessageType
 from shared.game_state import GameState as GameStateData
@@ -206,16 +207,19 @@ class App:
 
     def _do_connect(self, addr: str) -> None:
         if ":" in addr:
-            ip, port_str = addr.rsplit(":", 1)
+            host, port_str = addr.rsplit(":", 1)
             try:
                 port = int(port_str)
             except ValueError:
                 self.ui.set_status("Invalid port number")
                 return
         else:
-            ip, port = addr, 7777
+            host, port = addr, 7777
 
         try:
+            ip, port = socket.getaddrinfo(
+                host, port, family=socket.AF_INET, type=socket.SOCK_STREAM
+            )[0][4]
             self.client = Client(ip, port)
             self.ui.set_status(f"Connected to {ip}:{port}")
             self._go_login()
