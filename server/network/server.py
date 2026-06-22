@@ -123,7 +123,12 @@ class Server:
                 return
             conn.buf += chunk
             while True:
-                msg, conn.buf = Protocol.extract_message(conn.buf)
+                result = Protocol.extract_message(conn.buf)
+                if result is None:
+                    self.logger.warning(f"received malformed message from fd={fd}")
+                    self._disconnect_client(fd)
+                    return
+                msg, conn.buf = result
                 if msg is None:
                     break
                 self._handle_message(conn, msg)

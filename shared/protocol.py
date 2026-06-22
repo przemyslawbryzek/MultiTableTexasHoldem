@@ -5,6 +5,7 @@ from typing import TypedDict, Optional
 
 class Protocol:
     HEADER_SIZE = 4
+    MAX_MESSAGE_SIZE = 8192
 
     @staticmethod
     def encode_message(msg: dict) -> bytes:
@@ -13,11 +14,14 @@ class Protocol:
         return header + payload
 
     @staticmethod
-    def extract_message(buffer: bytes) -> tuple[Optional[dict], bytes]:
+    def extract_message(buffer: bytes) -> Optional[tuple[Optional[dict], bytes]]:
         if len(buffer) < Protocol.HEADER_SIZE:
             return None, buffer
 
         length = struct.unpack(">I", buffer[: Protocol.HEADER_SIZE])[0]
+
+        if length > Protocol.MAX_MESSAGE_SIZE:
+            return None
 
         if len(buffer) < Protocol.HEADER_SIZE + length:
             return None, buffer
@@ -27,10 +31,9 @@ class Protocol:
 
         try:
             msg = json.loads(payload.decode("utf-8"))
+            return msg, remaining
         except json.JSONDecodeError:
-            return None, remaining
-
-        return msg, remaining
+            return None
 
 
 class GetTablesMessage(TypedDict):
